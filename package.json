@@ -1,5 +1,5 @@
 {
-  "name": "review-log-plugin-app",
+  "name": "review-log-extension",
   "version": "0.1.0",
   "description": "A Chrome extension that captures console logs, deduplicates repeated entries, displays them in a Gemini-style side panel, and supports AI-powered analysis.",
   "scripts": {

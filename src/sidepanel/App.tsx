@@ -119,15 +119,38 @@ export default function App() {
   useEffect(() => {
     chrome.runtime.onMessage.addListener(handleMessage)
     
-    chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+    const loadTabHistory = async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       const activeTab = tabs[0]
       if (activeTab?.id) {
+        setRows([])
         chrome.runtime.sendMessage({ type: "log:request-history", tabId: activeTab.id })
       }
+    }
+
+    loadTabHistory()
+
+    const handleTabChange = (tabId: number, info: chrome.tabs.TabChangeInfo) => {
+      if (info.status === "complete") {
+        chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+          const activeTab = tabs[0]
+          if (activeTab?.id === tabId) {
+            loadTabHistory()
+          }
+        })
+      }
+    }
+
+    chrome.tabs.onActivated.addListener((activeInfo) => {
+      loadTabHistory()
     })
+
+    chrome.tabs.onUpdated.addListener(handleTabChange)
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
+      chrome.tabs.onActivated.removeListener(loadTabHistory)
+      chrome.tabs.onUpdated.removeListener(handleTabChange)
     }
   }, [handleMessage])
 

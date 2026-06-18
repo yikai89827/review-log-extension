@@ -213,12 +213,12 @@ if (isAlreadyInjected) {
     consoleObj[WRAPPED_FLAG] = true
     
     for (const level of levels) {
-      const originalFn = originalConsoleMethods[level]
-      consoleObj[level] = function(...args: unknown[]) {
+      const originalFn = originalConsoleMethods[level].bind(window.console)
+      consoleObj[level] = function(this: unknown, ...args: unknown[]) {
         postLog(level, args)
         // Call original console method
         if (typeof originalFn === "function") {
-          originalFn(...args)
+          originalFn.apply(this, args)
         }
       }
     }
