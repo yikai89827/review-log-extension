@@ -336,9 +336,13 @@ if (isAlreadyInjected) {
   }
 
   const EVENT_LISTENER_FLAG = "__review_log_event_listeners_added__"
+  const INPUT_ACTION_TRACKER = "__review_log_input_tracker__"
   
   if (!((window as unknown as Record<string, boolean>)[EVENT_LISTENER_FLAG])) {
     ;(window as unknown as Record<string, boolean>)[EVENT_LISTENER_FLAG] = true
+
+    // Track which input elements have already logged an action
+    const inputActionSent = new WeakSet<HTMLInputElement | HTMLTextAreaElement>()
 
     document.addEventListener(
       "click",
@@ -360,7 +364,29 @@ if (isAlreadyInjected) {
       (e) => {
         const t = e.target
         if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) return
-        postAction("input", describeTarget(t))
+        
+        // Only send action once per input element focus session
+        if (!inputActionSent.has(t)) {
+          inputActionSent.add(t)
+          postAction("input", describeTarget(t))
+        }
+        
+        // Log current value via console so it appears as a log entry
+        const value = t.value
+        const label = t.placeholder || t.name || t.id || 'input'
+        originalConsoleMethods.log(`[${label}]: ${value}`)
+      },
+      true
+    )
+
+    // Clear tracker on blur so next focus creates a new action
+    document.addEventListener(
+      "blur",
+      (e) => {
+        const t = e.target
+        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
+          inputActionSent.delete(t)
+        }
       },
       true
     )

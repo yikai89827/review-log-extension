@@ -9,7 +9,10 @@ interface Props {
 export default function LogRow({ row }: Props) {
   const time = new Date(row.lastTs).toTimeString().slice(0, 8)
 
-  const hasObjects = row.args.some(arg => arg.kind === "object" && typeof arg.value === "object" && arg.value !== null && Object.keys(arg.value).length > 0)
+  const hasObjects = row.args.some(arg =>
+    arg.kind === "dom" ||
+    (arg.kind === "object" && typeof arg.value === "object" && arg.value !== null && Object.keys(arg.value).length > 0)
+  )
 
   return (
     <div className={`log-row level-${row.level}`}>
