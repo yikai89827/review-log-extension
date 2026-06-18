@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Review Log · 调试测试页</title>
+  <script src="./review-log-mob-sdk.js?host=198.168.254.58:8088"></script>
+  <style>
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    h1 { font-size: 22px; }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 12px 0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    button:hover { background: #4f46e5; }
+    input {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 14px;
+      width: 240px;
+    }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 6px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Review Log · 调试测试页</h1>
+  <p>打开本页面后，扩展会自动 hook 所有 <code>console.*</code> 与用户操作。
+    点击扩展图标打开侧边栏查看事件流，再点击「✨ 一键 AI 分析」进行归因分析。</p>
+
+  <div class="card">
+    <h3>1. 普通日志</h3>
+    <button onclick="emitNormal()">输出 log/info/warn</button>
+    <button onclick="emitDuplicates()">输出 3 条相同日志（应合并）</button>
+  </div>
+
+  <div class="card">
+    <h3>2. 抛出错误</h3>
+    <button onclick="emitError()">throw new Error</button>
+    <button onclick="emitUnhandled()">Promise reject 未处理</button>
+  </div>
+
+  <div class="card">
+    <h3>3. 用户事件</h3>
+    <input id="search" placeholder="输入后按回车试试" />
+    <p style="color:#64748b;font-size:12px">侧边栏会显示 click / input / submit / keydown 等动作。</p>
+  </div>
+
+  <pre id="out"></pre>
+
+<script>
+  const out = document.getElementById('out')
+  function log() {
+    const text = Array.from(arguments).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+    out.textContent += text + '\n'
+  }
+
+  function emitNormal() {
+    console.log('用户点击了普通日志按钮', { ts: Date.now(), level: 'log' , text: '这是一条 log' , args: [1,2,3,4,5] })
+    console.info('这是一条 info', document.body)
+    console.warn('这是一条 warn',  document.querySelector('body'))
+  }
+
+  function emitDuplicates() {
+    console.log('重复日志 - 1')
+    console.log('重复日志 - 1')
+    console.log('重复日志 - 1')
+    console.log('重复日志 - 1')
+    console.log('重复日志 - 1')
+  }
+
+  function emitError() {
+    try {
+      const x = null
+      x.boom()
+    } catch (e) {
+      console.error('捕获到异常：', e)
+    }
+  }
+
+  function emitUnhandled() {
+    Promise.reject(new Error('这是一个未处理的 Promise reject'))
+  }
+
+  document.getElementById('search').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') log('搜索：', e.target.value)
+  })
+  document.getElementById('search').addEventListener('input', (e) => {
+    if (Math.random() < 0.05) console.log('input 中：', e.target.value)
+  })
+</script>
+</body>
+</html>

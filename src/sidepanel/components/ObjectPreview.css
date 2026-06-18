@@ -1,0 +1,101 @@
+.entry {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.entry-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.4;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expand-btn:hover {
+  color: #ccc;
+}
+
+.entry-key {
+  color: #6a9955;
+}
+
+.entry-value {
+  font-family: "SF Mono", "Fira Code", "Monaco", "Consolas", monospace;
+}
+
+.entry-hint {
+  color: #888;
+  font-size: 12px;
+}
+
+.entry-children {
+  margin-top: 2px;
+}
+
+.color-string {
+  color: #ce9178;
+}
+
+.color-number {
+  color: #b5cea8;
+}
+
+.color-boolean {
+  color: #569cd6;
+}
+
+.color-null {
+  color: #888;
+}
+
+.color-function {
+  color: #dcdcaa;
+}
+
+.color-symbol {
+  color: #c586c0;
+}
+
+.color-error {
+  color: #f14c4c;
+}
+
+.color-array {
+  color: #4ec9b0;
+}
+
+.color-object {
+  color: #4ec9b0;
+}
+
+.color-dom {
+  color: #e17055;
+}
+
+.error-stack {
+  margin: 4px 0;
+  padding: 8px 12px;
+  background: rgba(248, 113, 113, 0.1);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #fca5a5;
+}

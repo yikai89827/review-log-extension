@@ -1,0 +1,110 @@
+// Shared types used across background, content, sidepanel and the injected main-world script.
+
+export type LogLevel = "log" | "info" | "warn" | "error" | "debug"
+
+export interface LogEntry {
+  id?: string
+  seq: number
+  level: LogLevel
+  args: SerializedArg[]
+  text: string
+  ts: number
+  tabId?: number | string
+  url?: string
+  source?: 'pc' | 'mobile'
+}
+
+export interface DomNode {
+  tagName: string
+  id: string
+  className: string
+  attributes: Record<string, string>
+  textContent: string
+  children: DomNode[]
+  nodeType: number
+  nodeName: string
+}
+
+export type SerializedArg =
+  | { kind: "string"; value: string }
+  | { kind: "number"; value: number }
+  | { kind: "boolean"; value: boolean }
+  | { kind: "null" }
+  | { kind: "undefined" }
+  | { kind: "object"; value: Record<string, SerializedArg> | SerializedArg[] }
+  | { kind: "function"; value: string }
+  | { kind: "symbol"; value: string }
+  | { kind: "bigint"; value: string }
+  | { kind: "error"; name: string; message: string; stack?: string }
+  | { kind: "dom"; value: DomNode }
+
+export interface PageActionEvent {
+  type: "user-event"
+  action: string
+  target?: string
+  ts: number
+  url: string
+  tabId?: number | string
+}
+
+export interface InjectToContentMessage {
+  source: "review-log-inject"
+  payload: LogEntry
+}
+
+export interface InjectEventMessage {
+  source: "review-log-inject-event"
+  payload: PageActionEvent
+}
+
+export interface LogForwardMessage {
+  type: "log:append"
+  entry: LogEntry
+}
+
+export interface LogClearMessage {
+  type: "log:clear"
+  tabId: number | string
+}
+
+export interface PageActionForwardMessage {
+  type: "action:append"
+  event: PageActionEvent & { tabId: number | string }
+}
+
+export interface MobileDevice {
+  id: string
+  logCount: number
+  actionCount: number
+}
+
+export type RuntimeMessage =
+  | LogForwardMessage
+  | LogClearMessage
+  | PageActionForwardMessage
+  | { type: "log:subscribe" }
+  | { type: "log:request-history"; tabId: number | string }
+  | { type: "log:request-history-response"; entries: LogEntry[]; actions: PageActionEvent[] }
+  | { type: "log:open-panel"; tabId?: number }
+  | { type: "log:config"; config: AiConfig }
+  | { type: "log:ai-result"; requestId: string; result: AiResult }
+  | { type: "log:ai-error"; requestId: string; error: string }
+  | { type: "mobile:connect"; serverUrl: string }
+  | { type: "mobile:disconnect" }
+  | { type: "mobile:get-status" }
+  | { type: "mobile:status"; connected: boolean; serverUrl: string }
+  | { type: "mobile:connected"; serverUrl: string }
+  | { type: "mobile:disconnected" }
+  | { type: "mobile:list-devices" }
+  | { type: "mobile:devices"; devices: MobileDevice[] }
+
+export interface AiConfig {
+  endpoint: string
+  model: string
+  apiKey: string
+}
+
+export interface AiResult {
+  analysis: string
+  fix: string
+}

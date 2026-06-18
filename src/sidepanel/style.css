@@ -1,0 +1,304 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  height: 100%;
+  overflow: hidden;
+  overflow-x: hidden;
+}
+
+#review-log-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
+
+.app-shell.dark {
+  background: #0f0f12;
+  color: #e5e7eb;
+}
+
+.app-shell.dark #review-log-root {
+  background: #0f0f12;
+}
+
+.app-shell.light {
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.app-shell.light #review-log-root {
+  background: #ffffff;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.app-shell.dark .app-header {
+  background: #1c1c20;
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.app-shell.light .app-header {
+  background: #f3f4f6;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-shell.dark .icon-btn {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.light .icon-btn {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.icon-btn:hover {
+  border-radius: 6px;
+}
+
+.app-shell.dark .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb;
+}
+
+.app-shell.light .icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1f2937;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+.app-shell.dark .filter-bar {
+  background: #0f0f12;
+}
+
+.app-shell.light .filter-bar {
+  background: #ffffff;
+}
+
+.filter-bar button {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-shell.dark .filter-bar button {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.light .filter-bar button {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.filter-bar button:hover {
+  border-radius: 4px;
+}
+
+.app-shell.dark .filter-bar button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb;
+}
+
+.app-shell.light .filter-bar button:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1f2937;
+}
+
+.filter-bar button.active {
+  border-radius: 4px;
+}
+
+.app-shell.dark .filter-bar button.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+}
+
+.app-shell.light .filter-bar button.active {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1f2937;
+}
+
+.count {
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 11px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.app-shell.dark .count {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.light .count {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.log-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+  min-height: 0;
+  word-break: break-all;
+}
+
+.app-shell.dark .log-scroll {
+  background: #0f0f12;
+}
+
+.app-shell.light .log-scroll {
+  background: #ffffff;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-title {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.app-shell.dark .empty-title {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.app-shell.light .empty-title {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.empty-hint {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-shell.dark .empty-hint {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.app-shell.light .empty-hint {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.app-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.app-shell.dark .app-footer {
+  background: #16161a;
+}
+
+.app-shell.light .app-footer {
+  background: #f3f4f6;
+}
+
+.primary-btn {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer-hint {
+  font-size: 11px;
+}
+
+.app-shell.dark .footer-hint {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.app-shell.light .footer-hint {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "review-log-plugin-app",
+  "version": "0.1.0",
+  "description": "A Chrome extension that captures console logs, deduplicates repeated entries, displays them in a Gemini-style side panel, and supports AI-powered analysis.",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package",
+    "preview": "plasmo preview"
+  },
+  "dependencies": {
+    "plasmo": "0.90.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@plasmohq/parcel-config": "0.40.0",
+    "@types/chrome": "0.0.270",
+    "@types/node": "20.16.5",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "typescript": "5.5.4"
+  },
+  "manifest": {
+    "name": "Review Log",
+    "description": "Capture, deduplicate and AI-analyze console logs in a Gemini-style side panel.",
+    "host_permissions": [
+      "<all_urls>"
+    ],
+    "permissions": [
+      "sidePanel",
+      "tabs",
+      "storage",
+      "scripting"
+    ]
+  }
+}
