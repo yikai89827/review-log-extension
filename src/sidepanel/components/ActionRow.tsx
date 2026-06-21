@@ -1,5 +1,6 @@
 import type { DisplayRow } from "../../utils/logDedupe"
-import { ClampedText } from "./ClampedText"
+import { ClampedText } from "./LogRow"
+import "./LogRow.css"
 import "./ActionRow.css"
 
 interface Props {

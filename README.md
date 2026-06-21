@@ -124,11 +124,10 @@ src/
 │   ├── SidepanelShell.tsx      # 挂载兜底 + Error Boundary
 │   ├── messageHub.ts           # 全局消息监听（防 HMR 重复注册）
 │   └── components/
-│       ├── LogRow.tsx          # 日志行 + 堆栈
+│       ├── LogRow.tsx          # 日志行 + ClampedText（长文本截断）
 │       ├── ActionRow.tsx       # 用户行为行
 │       ├── NetworkRow.tsx      # 网络请求行
 │       ├── StackTrace.tsx      # 可点击堆栈
-│       ├── ClampedText.tsx     # 长文本 3 行截断 + hover 全文
 │       ├── ObjectPreview.tsx   # 结构化对象预览
 │       ├── ContextMenu.tsx     # 右键菜单
 │       ├── SettingsPanel.tsx   # AI 配置（模型预设）
