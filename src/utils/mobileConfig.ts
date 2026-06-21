@@ -1,6 +1,7 @@
 /**
  * 移动端连接配置工具
  * 从环境变量读取默认配置
+ * Plasmo 会自动将 PLASMO_PUBLIC_ 前缀的环境变量注入到前端
  */
 
 export interface MobileConfig {
@@ -21,6 +22,8 @@ export interface MobileConfig {
 }
 
 export function getMobileConfig(): MobileConfig {
+  // Plasmo 会将 PLASMO_PUBLIC_ 前缀的环境变量注入到前端
+  // 访问时使用 process.env.PUBLIC_XXX
   return {
     defaultMode: (process.env.PUBLIC_DEFAULT_CONNECTION_MODE as 'self-hosted' | 'goeasy') || 'self-hosted',
     
