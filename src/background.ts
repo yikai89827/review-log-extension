@@ -9,6 +9,8 @@ import type {
   RuntimeMessage
 } from "./types"
 
+import { saveLog, saveAction, deleteLogsByTabId } from "./utils/indexedDB"
+
 const MAX_ENTRIES_PER_TAB = 2000
 
 const seqByTab = new Map<number | string, number>()
@@ -172,6 +174,8 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       const entry: LogEntry = { ...msg.entry, tabId }
       const tagged = appendLog(entry, tabId)
       void broadcast({ type: 'log:append', entry: tagged })
+      // 保存到 IndexedDB
+      void saveLog(tabId, entry)
       return false
     }
 
@@ -180,11 +184,15 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       const event = { ...msg.event, tabId }
       appendAction(event, tabId)
       void broadcast({ type: 'action:append', event })
+      // 保存到 IndexedDB
+      void saveAction(tabId, event)
       return false
     }
 
     if (msg.type === 'log:clear') {
       clearKey(msg.tabId)
+      // 从 IndexedDB 删除
+      void deleteLogsByTabId(msg.tabId)
       return false
     }
 
@@ -272,6 +280,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     history.delete(tabId)
     actions.delete(tabId)
     seqByTab.delete(tabId)
+    // 从 IndexedDB 删除
+    void deleteLogsByTabId(tabId)
   }
 })
 

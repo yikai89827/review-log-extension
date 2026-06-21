@@ -413,6 +413,34 @@ if (isAlreadyInjected) {
       },
       true
     )
+
+    // 默认输出当前页面 body 下的文本内容，等待DOM加载完成后执行
+    function printBodyDom() {
+      if (document.body) {
+        const bodyText = document.body.textContent?.trim() || ""
+        // 保留原始换行符，最多显示5000字符
+        const displayText = bodyText.length > 5000 ? bodyText.slice(0, 5000) + "\n..." : bodyText
+        
+        const entry: LogEntry = {
+          seq: 0,
+          level: "log",
+          args: [{ kind: "string", value: displayText }],
+          text: `=== Page Body Content ===\n${displayText}`,
+          ts: Date.now(),
+          url: location.href
+        }
+        const msg: InjectToContentMessage = { source: HANDSHAKE, payload: entry }
+        window.postMessage(msg, window.location.origin)
+      }
+    }
+    
+    // 如果DOM已经加载完成，立即执行；否则等待DOMContentLoaded事件
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", printBodyDom, { once: true })
+    } else {
+      // 延迟一小段时间确保所有资源都已加载
+      setTimeout(printBodyDom, 100)
+    }
   }
 
   window.postMessage({ source: `${HANDSHAKE}-ready` }, window.location.origin)
