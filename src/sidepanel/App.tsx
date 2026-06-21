@@ -340,7 +340,12 @@ export default function App() {
       )}
 
       {settingsOpen && (
-        <SettingsPanel config={aiConfig} onChange={setAiConfig} onClose={() => setSettingsOpen(false)} />
+        <SettingsPanel
+          config={aiConfig}
+          onChange={setAiConfig}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => showToast("AI 设置已保存")}
+        />
       )}
 
       <footer className="app-footer">

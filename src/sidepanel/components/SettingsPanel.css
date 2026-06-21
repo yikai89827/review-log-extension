@@ -53,7 +53,8 @@
 }
 
 .settings-body input[type="text"],
-.settings-body input[type="password"] {
+.settings-body input[type="password"],
+.settings-select {
   background: #0f0f12;
   color: #e5e7eb;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -65,9 +66,44 @@
   width: 100%;
 }
 
+.settings-body input[readonly] {
+  opacity: 0.85;
+  cursor: default;
+}
+
+.settings-select {
+  cursor: pointer;
+}
+
 .settings-body input[type="text"]:focus,
-.settings-body input[type="password"]:focus {
+.settings-body input[type="password"]:focus,
+.settings-select:focus {
   border-color: #6366f1;
+}
+
+.field-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.model-id-display {
+  padding: 8px 10px;
+  background: #0f0f12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a5b4fc;
+  word-break: break-all;
+}
+
+.settings-error {
+  color: #fca5a5;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border-radius: 6px;
 }
 
 .key-row {

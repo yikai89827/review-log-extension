@@ -3,6 +3,11 @@
 
 import type { AiConfig, AiResult } from "../types"
 
+export type { AiConfig, AiResult } from "../types"
+
+export { AI_MODEL_PRESETS, matchPreset, getPreset } from "./aiModels"
+export type { AiModelPreset } from "./aiModels"
+
 const DEFAULT_CONFIG: AiConfig = {
   endpoint: "https://api.openai.com/v1/chat/completions",
   model: "gpt-4o-mini",
