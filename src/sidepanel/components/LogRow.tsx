@@ -29,8 +29,10 @@ export function ClampedText({ text, className = "", lines = 3, children }: Clamp
     >
       <div className="clamped-text-inner">{children ?? text}</div>
       {showPopover && isLong && (
-        <div className="clamped-text-popover" role="tooltip">
-          {text}
+        <div className="clamped-text-popover-wrap">
+          <div className="clamped-text-popover" role="tooltip">
+            {text}
+          </div>
         </div>
       )}
     </div>

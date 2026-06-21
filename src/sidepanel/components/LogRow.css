@@ -158,14 +158,18 @@
   max-height: 3.1em;
 }
 
-.clamped-text-popover {
+.clamped-text-popover-wrap {
   position: absolute;
   left: 0;
   top: 100%;
   z-index: 30;
-  margin-top: 4px;
+  /* 透明桥接区：鼠标从日志移向浮层时不会触发 mouseleave */
+  padding-top: 6px;
   min-width: 200px;
   max-width: 520px;
+}
+
+.clamped-text-popover {
   max-height: 280px;
   overflow: auto;
   padding: 8px 10px;
@@ -179,5 +183,13 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: auto;
+}
+
+.app-shell.light .clamped-text-popover {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1f2937;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
