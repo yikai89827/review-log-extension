@@ -1,14 +1,20 @@
 .entry {
   display: block;
+  min-width: 0;
+  max-width: 100%;
   white-space: pre-wrap;
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .entry-line {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: 4px;
   line-height: 1.4;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .expand-btn {
@@ -36,6 +42,10 @@
 
 .entry-value {
   font-family: "SF Mono", "Fira Code", "Monaco", "Consolas", monospace;
+  min-width: 0;
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .entry-hint {

@@ -1,15 +1,16 @@
 .log-row {
   display: grid;
-  grid-template-columns: 60px 56px 1fr auto;
+  grid-template-columns: 60px 56px minmax(0, 1fr) auto;
   gap: 8px;
   padding: 4px 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  word-break: break-all;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   white-space: pre-wrap;
-  overflow: hidden;
 }
 
 .row-time {
@@ -73,6 +74,9 @@
 
 .row-content {
   min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .row-text pre {
@@ -84,13 +88,19 @@
 
 .row-args {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .arg-item {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .row-count {

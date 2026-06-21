@@ -6,10 +6,23 @@ import type { LogEntry, PageActionEvent, RuntimeMessage } from "./types"
 import { saveLog, saveAction, deleteLogsByTabId } from "./utils/indexedDB"
 
 const MAX_ENTRIES_PER_TAB = 2000
+const MAX_SEEN_EVENT_IDS = 5000
 
 const seqByTab = new Map<number, number>()
 const history = new Map<number, LogEntry[]>()
 const actions = new Map<number, (PageActionEvent & { tabId?: number })[]>()
+const seenEventIds = new Set<string>()
+
+function rememberEventId(eventId: string | undefined): boolean {
+  if (!eventId) return false
+  if (seenEventIds.has(eventId)) return true
+  seenEventIds.add(eventId)
+  if (seenEventIds.size > MAX_SEEN_EVENT_IDS) {
+    const oldest = seenEventIds.values().next().value
+    if (oldest) seenEventIds.delete(oldest)
+  }
+  return false
+}
 
 function nextSeq(tabId: number): number {
   const n = (seqByTab.get(tabId) ?? 0) + 1
@@ -68,6 +81,7 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
     if (msg.type === "log:append") {
       const tabId = sender.tab?.id ?? -1
       if (tabId < 0) return false
+      if (rememberEventId(msg.entry.eventId)) return false
       const entry: LogEntry = { ...msg.entry, tabId }
       const tagged = appendLog(entry, tabId)
       void broadcast({ type: "log:append", entry: tagged })
@@ -78,6 +92,7 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
     if (msg.type === "action:append") {
       const tabId = sender.tab?.id ?? msg.event.tabId ?? -1
       if (typeof tabId !== "number" || tabId < 0) return false
+      if (rememberEventId(msg.event.eventId)) return false
       const event = { ...msg.event, tabId }
       appendAction(event, tabId)
       void broadcast({ type: "action:append", event })

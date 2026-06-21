@@ -2,17 +2,30 @@ import type { RuntimeMessage } from "../types"
 
 type Handler = (msg: RuntimeMessage) => void
 
-let handler: Handler | null = null
-let installed = false
+const HUB_KEY = "__review_log_sidepanel_message_hub__"
 
-/** 全局唯一 listener，避免 HMR 重复注册导致日志双份 */
+interface HubState {
+  installed: boolean
+  handler: Handler | null
+}
+
+function getHub(): HubState {
+  const g = globalThis as typeof globalThis & { [HUB_KEY]?: HubState }
+  if (!g[HUB_KEY]) {
+    g[HUB_KEY] = { installed: false, handler: null }
+  }
+  return g[HUB_KEY]
+}
+
+/** 全局唯一 listener；flag 存 globalThis，HMR 重载模块时不会重复注册 */
 export function setSidepanelMessageHandler(next: Handler) {
-  handler = next
-  if (installed) return
-  installed = true
+  const hub = getHub()
+  hub.handler = next
+  if (hub.installed) return
+  hub.installed = true
   chrome.runtime.onMessage.addListener((msg) => {
-    if (handler && msg && typeof msg === "object") {
-      handler(msg as RuntimeMessage)
+    if (hub.handler && msg && typeof msg === "object") {
+      hub.handler(msg as RuntimeMessage)
     }
   })
 }

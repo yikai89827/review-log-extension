@@ -38,21 +38,36 @@ export function nextId(): string {
   return `${Date.now().toString(36)}-${_id.toString(36)}`
 }
 
-const seenLogKeys = new Set<string>()
-const seenActionKeys = new Set<string>()
+const DEDUPE_KEY = "__review_log_dedupe_sets__"
+
+interface DedupeSets {
+  logs: Set<string>
+  actions: Set<string>
+}
+
+function getDedupeSets(): DedupeSets {
+  const g = globalThis as typeof globalThis & { [DEDUPE_KEY]?: DedupeSets }
+  if (!g[DEDUPE_KEY]) {
+    g[DEDUPE_KEY] = { logs: new Set(), actions: new Set() }
+  }
+  return g[DEDUPE_KEY]
+}
 
 function logDedupeKey(entry: LogEntry): string {
+  if (entry.eventId) return entry.eventId
   return `${entry.tabId ?? -1}:${entry.seq}`
 }
 
 function actionDedupeKey(event: PageActionEvent & { tabId?: number }): string {
+  if (event.eventId) return event.eventId
   return `${event.tabId ?? -1}:${event.action}:${event.target ?? ""}:${event.ts}`
 }
 
 /** Clear dedupe cache (on clear / history reload). */
 export function resetLogDedupe(): void {
-  seenLogKeys.clear()
-  seenActionKeys.clear()
+  const sets = getDedupeSets()
+  sets.logs.clear()
+  sets.actions.clear()
 }
 
 /**
@@ -60,11 +75,10 @@ export function resetLogDedupe(): void {
  * is a log with the same key.
  */
 export function pushLog(rows: DisplayRow[], entry: LogEntry): DisplayRow[] {
-  if (entry.seq > 0) {
-    const dedupeKey = logDedupeKey(entry)
-    if (seenLogKeys.has(dedupeKey)) return rows
-    seenLogKeys.add(dedupeKey)
-  }
+  const sets = getDedupeSets()
+  const dedupeKey = logDedupeKey(entry)
+  if (sets.logs.has(dedupeKey)) return rows
+  sets.logs.add(dedupeKey)
 
   const key = logKey(entry)
   const last = rows[rows.length - 1]
@@ -96,9 +110,10 @@ export function pushAction(
   rows: DisplayRow[],
   event: PageActionEvent & { tabId?: number }
 ): DisplayRow[] {
+  const sets = getDedupeSets()
   const dedupeKey = actionDedupeKey(event)
-  if (seenActionKeys.has(dedupeKey)) return rows
-  seenActionKeys.add(dedupeKey)
+  if (sets.actions.has(dedupeKey)) return rows
+  sets.actions.add(dedupeKey)
 
   return [
     ...rows,

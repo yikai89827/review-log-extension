@@ -21,9 +21,18 @@ export const config: PlasmoCSConfig = {
 
 const HANDSHAKE = "review-log-inject"
 const WINDOW_INIT_FLAG = "__review_log_main_injected__"
+const WRAPPED_FLAG = "__review_log_wrapped__"
 
-// Check if already injected - MUST check synchronously before any side effects
-const isAlreadyInjected = (window as unknown as Record<string, boolean>)[WINDOW_INIT_FLAG]
+let eventCounter = 0
+function nextEventId(): string {
+  eventCounter += 1
+  return `${Date.now()}-${eventCounter}`
+}
+
+const consoleObj = window.console as unknown as Record<string, unknown>
+const isAlreadyInjected =
+  (window as unknown as Record<string, boolean>)[WINDOW_INIT_FLAG] ||
+  !!consoleObj[WRAPPED_FLAG]
 
 if (isAlreadyInjected) {
   // Already injected, do nothing
@@ -178,6 +187,7 @@ if (isAlreadyInjected) {
     const serialized = args.map((a) => serializeArg(a))
     const text = args.map((a) => safeStringify(a)).join(" ")
     return {
+      eventId: nextEventId(),
       seq: 0,
       level,
       args: serialized,
@@ -204,10 +214,6 @@ if (isAlreadyInjected) {
     }
   }
 
-  // Create a wrapper object to store wrapped console methods
-  const consoleObj = window.console as unknown as Record<string, any>
-  const WRAPPED_FLAG = "__review_log_wrapped__"
-  
   // Check if console has already been wrapped
   if (!consoleObj[WRAPPED_FLAG]) {
     consoleObj[WRAPPED_FLAG] = true
@@ -251,6 +257,7 @@ if (isAlreadyInjected) {
       type: "user-event",
       action,
       target,
+      eventId: nextEventId(),
       ts: Date.now(),
       url: location.href
     }

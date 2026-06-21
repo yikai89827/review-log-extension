@@ -4,6 +4,8 @@ export type LogLevel = "log" | "info" | "warn" | "error" | "debug"
 
 export interface LogEntry {
   id?: string
+  /** Unique id from inject script; used to dedupe across HMR / double listeners */
+  eventId?: string
   seq: number
   level: LogLevel
   args: SerializedArg[]
@@ -44,6 +46,7 @@ export interface PageActionEvent {
   ts: number
   url: string
   tabId?: number | string
+  eventId?: string
 }
 
 export interface InjectToContentMessage {

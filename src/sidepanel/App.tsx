@@ -8,6 +8,7 @@ import {
   type DisplayRow
 } from "../utils/logDedupe"
 import { analyzeLogs, loadConfig, saveConfig, type AiConfig } from "../utils/ai"
+import { safeRuntimeSendMessage } from "../utils/extensionContext"
 import type { RuntimeMessage } from "../types"
 import LogRow from "./components/LogRow"
 import ActionRow from "./components/ActionRow"
@@ -56,7 +57,7 @@ export default function App() {
     setRows([])
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     const tabId = tabs[0]?.id ?? -1
-    chrome.runtime.sendMessage({ type: "log:clear", tabId })
+    safeRuntimeSendMessage({ type: "log:clear", tabId })
   }, [])
 
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function App() {
       if (activeTab?.id) {
         resetLogDedupe()
         setRows([])
-        chrome.runtime.sendMessage({ type: "log:request-history", tabId: activeTab.id })
+        safeRuntimeSendMessage({ type: "log:request-history", tabId: activeTab.id })
       }
     }
 
