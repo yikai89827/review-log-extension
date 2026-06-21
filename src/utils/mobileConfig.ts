@@ -22,16 +22,16 @@ export interface MobileConfig {
 
 export function getMobileConfig(): MobileConfig {
   return {
-    defaultMode: (process.env.DEFAULT_CONNECTION_MODE as 'self-hosted' | 'goeasy') || 'self-hosted',
+    defaultMode: (process.env.PUBLIC_DEFAULT_CONNECTION_MODE as 'self-hosted' | 'goeasy') || 'self-hosted',
     
     selfHosted: {
-      serverUrl: process.env.SELF_HOSTED_SERVER_URL || ''
+      serverUrl: process.env.PUBLIC_SELF_HOSTED_SERVER_URL || ''
     },
     
     goeasy: {
-      host: process.env.GOEASY_HOST || 'hangzhou.goeasy.io',
-      appkey: process.env.GOEASY_APPKEY || '',
-      channel: process.env.GOEASY_CHANNEL || 'review-log-channel'
+      host: process.env.PUBLIC_GOEASY_HOST || 'hangzhou.goeasy.io',
+      appkey: process.env.PUBLIC_GOEASY_APPKEY || '',
+      channel: process.env.PUBLIC_GOEASY_CHANNEL || 'review-log-channel'
     }
   }
 }

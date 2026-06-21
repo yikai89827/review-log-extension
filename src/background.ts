@@ -10,6 +10,7 @@ import type {
 } from "./types"
 
 import { saveLog, saveAction, deleteLogsByTabId } from "./utils/indexedDB"
+import { loadMobileConfig, saveMobileConfig, type SavedMobileConfig } from "./utils/mobileStorage"
 
 const MAX_ENTRIES_PER_TAB = 2000
 
@@ -151,11 +152,44 @@ const WS_RECONNECT_INTERVAL = 3000
 // GoEasy 相关状态
 let goEasyConnected = false
 let goEasyChannel = ''
+let currentGoEasyConfig: GoEasyConfig | null = null
 
 interface GoEasyConfig {
   host: string
   appkey: string
   channel: string
+}
+
+// 当前连接模式
+let currentConnectionMode: 'self-hosted' | 'goeasy' = 'self-hosted'
+
+// 服务启动时自动加载配置并尝试连接
+chrome.runtime.onStartup.addListener(async () => {
+  await tryAutoConnect()
+})
+
+// 扩展安装/更新时也尝试自动连接
+chrome.runtime.onInstalled.addListener(async () => {
+  await tryAutoConnect()
+})
+
+// 尝试自动连接
+async function tryAutoConnect() {
+  const savedConfig = await loadMobileConfig()
+  if (savedConfig) {
+    console.log('[ReviewLog] 找到保存的配置，尝试自动连接...')
+    if (savedConfig.mode === 'goeasy') {
+      startGoEasyConnection({
+        host: savedConfig.goeasyHost,
+        appkey: savedConfig.goeasyAppkey,
+        channel: savedConfig.goeasyChannel
+      })
+    } else {
+      startMobilePolling(savedConfig.selfHostedServerUrl)
+    }
+  } else {
+    console.log('[ReviewLog] 未找到保存的配置')
+  }
 }
 
 function startMobilePolling(url: string) {
