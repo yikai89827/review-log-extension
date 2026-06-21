@@ -156,6 +156,7 @@ export default function App() {
 
   const openRowContextMenu = useCallback((e: React.MouseEvent, row?: DisplayRow) => {
     e.preventDefault()
+    e.stopPropagation()
     setContextMenu({ x: e.clientX, y: e.clientY, row })
   }, [])
 
@@ -286,7 +287,6 @@ export default function App() {
                   relatedSelector={relatedSelector}
                   relatedNetwork={relatedNetwork}
                   searchQuery={searchQuery}
-                  onCopy={() => void copyRow(row)}
                   onContextMenu={(e) => openRowContextMenu(e, row)}
                 />
               )
@@ -296,6 +296,7 @@ export default function App() {
                 <NetworkRow
                   key={row.id}
                   row={row}
+                  onContextMenu={(e) => openRowContextMenu(e, row)}
                 />
               )
             }
@@ -304,7 +305,6 @@ export default function App() {
                 key={row.id}
                 row={row}
                 searchQuery={searchQuery}
-                onCopy={() => void copyRow(row)}
                 onContextMenu={(e) => openRowContextMenu(e, row)}
                 onTargetClick={(selector) => void highlightDomInActiveTab({ selector })}
               />
@@ -320,7 +320,7 @@ export default function App() {
           onClose={() => setContextMenu(null)}
           items={[
             ...(contextMenu.row
-              ? [{ label: "复制本条", onClick: () => void copyRow(contextMenu.row!) }]
+              ? [{ label: "复制本条日志", onClick: () => void copyRow(contextMenu.row!) }]
               : []),
             { label: "复制全部（当前列表）", onClick: () => void copyAllVisible() },
             { label: "导出 txt + json", onClick: exportLogs }
@@ -353,7 +353,7 @@ export default function App() {
           {analyzing && <span className="spinner" aria-hidden="true" />}
           <span>{analyzing ? "AI 分析中…" : "✨ 一键 AI 分析"}</span>
         </button>
-        <div className="footer-hint">显示 {sortedRows.length} / {rows.length} 条 · 双击复制 · 右键菜单</div>
+        <div className="footer-hint">显示 {sortedRows.length} / {rows.length} 条 · 右键菜单</div>
       </footer>
     </div>
   )

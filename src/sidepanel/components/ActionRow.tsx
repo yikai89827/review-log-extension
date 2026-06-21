@@ -1,10 +1,10 @@
 import type { DisplayRow } from "../../utils/logDedupe"
+import { ClampedText } from "./ClampedText"
 import "./ActionRow.css"
 
 interface Props {
   row: Extract<DisplayRow, { kind: "action" }>
   searchQuery?: string
-  onCopy?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
   onTargetClick?: (selector: string) => void
 }
@@ -12,7 +12,6 @@ interface Props {
 export default function ActionRow({
   row,
   searchQuery,
-  onCopy,
   onContextMenu,
   onTargetClick
 }: Props) {
@@ -33,12 +32,7 @@ export default function ActionRow({
   }
 
   return (
-    <div
-      className="action-row"
-      onDoubleClick={onCopy}
-      onContextMenu={onContextMenu}
-      title="双击复制本条日志"
-    >
+    <div className="action-row" onContextMenu={onContextMenu}>
       <div className="row-time">{time}</div>
       <div className="action-icon">⚡</div>
       <div className="action-content">
@@ -48,17 +42,19 @@ export default function ActionRow({
         {row.target && (
           <div className="action-target-wrapper">
             <span className="target-label">触发元素:</span>
-            <button
-              type="button"
-              className="action-target action-target-btn"
-              title="在页面中高亮此元素"
-              onClick={(e) => {
-                e.stopPropagation()
-                onTargetClick?.(row.target!)
-              }}
-            >
-              {highlight(row.target)}
-            </button>
+            <ClampedText text={row.target} className="action-target-clamp" lines={3}>
+              <button
+                type="button"
+                className="action-target action-target-btn"
+                title="在页面中高亮此元素"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTargetClick?.(row.target!)
+                }}
+              >
+                {highlight(row.target)}
+              </button>
+            </ClampedText>
           </div>
         )}
       </div>

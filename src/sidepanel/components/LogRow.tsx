@@ -2,6 +2,7 @@ import type { DisplayRow } from "../../utils/logDedupe"
 import { splitErrorText } from "../../utils/stackParser"
 import ObjectPreview from "./ObjectPreview"
 import StackTrace from "./StackTrace"
+import { ClampedText } from "./ClampedText"
 import "./LogRow.css"
 
 interface Props {
@@ -9,7 +10,6 @@ interface Props {
   relatedSelector?: string
   relatedNetwork?: Extract<DisplayRow, { kind: "network" }>
   searchQuery?: string
-  onCopy?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
 }
 
@@ -32,7 +32,6 @@ export default function LogRow({
   relatedSelector,
   relatedNetwork,
   searchQuery,
-  onCopy,
   onContextMenu
 }: Props) {
   const time = new Date(row.lastTs).toTimeString().slice(0, 8)
@@ -52,9 +51,7 @@ export default function LogRow({
   return (
     <div
       className={`log-row level-${row.level}${row.inputKey ? " log-row-input" : ""}`}
-      onDoubleClick={onCopy}
       onContextMenu={onContextMenu}
-      title="双击复制本条日志"
     >
       <div className="row-time">{time}</div>
       <div className="row-level">{row.level.toUpperCase()}</div>
@@ -69,17 +66,22 @@ export default function LogRow({
           </div>
         ) : errorParts?.stack ? (
           <div className="error-block">
-            <pre className="row-text">{highlightText(errorParts.message, searchQuery)}</pre>
+            <ClampedText text={errorParts.message} className="row-text">
+              {highlightText(errorParts.message, searchQuery)}
+            </ClampedText>
             <StackTrace stack={errorParts.stack} relatedSelector={relatedSelector} />
           </div>
         ) : (
-          <pre className="row-text">{highlightText(row.text, searchQuery)}</pre>
+          <ClampedText text={row.text} className="row-text">
+            {highlightText(row.text, searchQuery)}
+          </ClampedText>
         )}
         {relatedNetwork && (
-          <div className="related-network" title="时间邻近的网络请求">
-            ↗ {relatedNetwork.method} {relatedNetwork.url}
-            {relatedNetwork.status != null ? ` · ${relatedNetwork.status}` : ""}
-          </div>
+          <ClampedText
+            text={`↗ ${relatedNetwork.method} ${relatedNetwork.url}${relatedNetwork.status != null ? ` · ${relatedNetwork.status}` : ""}`}
+            className="related-network"
+            lines={2}
+          />
         )}
       </div>
       {row.count > 1 && (

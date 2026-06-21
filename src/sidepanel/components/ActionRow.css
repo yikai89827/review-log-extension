@@ -81,3 +81,13 @@
 .action-target-btn:hover {
   color: #c7d2fe;
 }
+
+.action-target-clamp {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.action-target-clamp .action-target-btn {
+  display: block;
+  width: 100%;
+}
