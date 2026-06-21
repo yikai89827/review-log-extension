@@ -14,6 +14,7 @@
       padding: 0 16px;
     }
     h1 { font-size: 22px; }
+    h3 { font-size: 16px; color: #475569; }
     .card {
       background: #fff;
       border: 1px solid #e2e8f0;
@@ -33,6 +34,8 @@
       cursor: pointer;
     }
     button:hover { background: #4f46e5; }
+    .btn-goeasy { background: #22c55e; }
+    .btn-goeasy:hover { background: #16a34a; }
     input {
       padding: 6px 10px;
       border-radius: 6px;
@@ -41,6 +44,9 @@
       width: 240px;
     }
     pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 6px; overflow: auto; }
+    .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .status.connected { background: #dcfce7; color: #166534; }
+    .status.disconnected { background: #fee2e2; color: #991b1b; }
   </style>
 </head>
 <body>
@@ -66,13 +72,85 @@
     <p style="color:#64748b;font-size:12px">侧边栏会显示 click / input / submit / keydown 等动作。</p>
   </div>
 
+  <div class="card">
+    <h3>4. GoEasy WebSocket 测试</h3>
+    <p>AppKey: <input type="text" id="appkey" value="BC-e65c9385836d46e2a8b408117de2fbdc" style="width:300px" /></p>
+    <p>Host: <input type="text" id="goeasyHost" value="hangzhou.goeasy.io" style="width:200px" /></p>
+    <p>频道: <input type="text" id="channel" value="review-log-channel" style="width:200px" /></p>
+    <p>消息: <input type="text" id="message" value="Hello from Review Log SDK!" style="width:300px" /></p>
+    <p>
+      <button class="btn-goeasy" onclick="initGoEasy()">初始化连接</button>
+      <span id="goeasyStatus" class="status disconnected">未连接</span>
+    </p>
+    <p>
+      <button class="btn-goeasy" onclick="subscribeChannel()">订阅频道</button>
+      <button class="btn-goeasy" onclick="publishMessage()">推送消息</button>
+      <button class="btn-goeasy" onclick="disconnectGoEasy()">断开连接</button>
+    </p>
+    <pre id="goeasyLog" style="max-height:150px"></pre>
+  </div>
+
   <pre id="out"></pre>
 
 <script>
   const out = document.getElementById('out')
+  const goeasyLogEl = document.getElementById('goeasyLog')
+
+  function goeasyLog() {
+    const text = Array.from(arguments).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+    goeasyLogEl.textContent += '[' + new Date().toLocaleTimeString() + '] ' + text + '\n'
+  }
+
   function log() {
     const text = Array.from(arguments).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
     out.textContent += text + '\n'
+  }
+
+  function updateGoEasyStatus(connected) {
+    const statusEl = document.getElementById('goeasyStatus')
+    statusEl.textContent = connected ? '已连接' : '未连接'
+    statusEl.className = 'status ' + (connected ? 'connected' : 'disconnected')
+  }
+
+  function initGoEasy() {
+    const appkey = document.getElementById('appkey').value
+    const host = document.getElementById('goeasyHost').value
+    goeasyLog('初始化 GoEasy...')
+    ReviewLogSDK.initGoEasy({
+      appkey: appkey,
+      host: host
+    })
+    // 等待连接成功
+    setTimeout(() => {
+      updateGoEasyStatus(ReviewLogSDK.isGoEasyConnected())
+    }, 2000)
+  }
+
+  function subscribeChannel() {
+    const channel = document.getElementById('channel').value
+    goeasyLog('订阅频道:', channel)
+    ReviewLogSDK.subscribeGoEasy({
+      channel: channel,
+      onMessage: function(msg) {
+        goeasyLog('收到消息:', msg)
+      }
+    })
+  }
+
+  function publishMessage() {
+    const channel = document.getElementById('channel').value
+    const message = document.getElementById('message').value
+    goeasyLog('推送消息到', channel, ':', message)
+    ReviewLogSDK.publishGoEasy({
+      channel: channel,
+      content: message
+    })
+  }
+
+  function disconnectGoEasy() {
+    ReviewLogSDK.disconnectGoEasy()
+    updateGoEasyStatus(false)
+    goeasyLog('已断开连接')
   }
 
   function emitNormal() {

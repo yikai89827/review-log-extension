@@ -148,6 +148,16 @@ let wsReconnectAttempts = 0
 const MAX_WS_RECONNECT_ATTEMPTS = 10
 const WS_RECONNECT_INTERVAL = 3000
 
+// GoEasy 相关状态
+let goEasyConnected = false
+let goEasyChannel = ''
+
+interface GoEasyConfig {
+  host: string
+  appkey: string
+  channel: string
+}
+
 function startMobilePolling(url: string) {
   stopMobilePolling()
   mobileServerUrl = url
@@ -269,6 +279,81 @@ function stopMobilePolling() {
     mobileWebSocket.close()
     mobileWebSocket = null
   }
+  // 停止 GoEasy 连接
+  goEasyConnected = false
+  goEasyChannel = ''
+}
+
+function startGoEasyConnection(config: GoEasyConfig) {
+  stopMobilePolling()
+  goEasyChannel = config.channel
+  
+  // 构造 GoEasy WebSocket URL
+  const wsUrl = `wss://${config.host}/v2/ws?appkey=${encodeURIComponent(config.appkey)}`
+  
+  try {
+    mobileWebSocket = new WebSocket(wsUrl)
+    
+    mobileWebSocket.onopen = () => {
+      wsReconnectAttempts = 0
+      goEasyConnected = true
+      console.log('[ReviewLog] GoEasy WebSocket connected')
+      
+      // 订阅频道
+      const subscribeMsg = JSON.stringify({
+        channel: config.channel,
+        action: 'subscribe'
+      })
+      mobileWebSocket?.send(subscribeMsg)
+      
+      broadcast({ type: 'mobile:connected', serverUrl: config.host, mode: 'goeasy' })
+    }
+    
+    mobileWebSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        
+        // GoEasy 消息格式处理
+        if (data.content) {
+          // 解析移动端发送的日志消息
+          try {
+            const mobileData = JSON.parse(data.content)
+            if (mobileData.type === 'log' && mobileData.payload) {
+              handleMobileLogEntry(mobileData)
+            } else if (mobileData.type === 'action' && mobileData.payload) {
+              handleMobileActionEntry(mobileData)
+            }
+          } catch {
+            // 如果不是 JSON 格式，直接作为日志内容显示
+            console.log('[ReviewLog] GoEasy message:', data.content)
+          }
+        } else if (data.success === true && data.action === 'subscribe') {
+          console.log('[ReviewLog] GoEasy subscribed to channel:', config.channel)
+        }
+      } catch (e) {
+        console.warn('[ReviewLog] Failed to parse GoEasy message:', e)
+      }
+    }
+    
+    mobileWebSocket.onclose = () => {
+      console.log('[ReviewLog] GoEasy WebSocket disconnected')
+      goEasyConnected = false
+      broadcast({ type: 'mobile:disconnected' })
+      
+      if (wsReconnectAttempts < MAX_WS_RECONNECT_ATTEMPTS) {
+        wsReconnectAttempts++
+        setTimeout(() => {
+          startGoEasyConnection(config)
+        }, WS_RECONNECT_INTERVAL * wsReconnectAttempts)
+      }
+    }
+    
+    mobileWebSocket.onerror = (error) => {
+      console.error('[ReviewLog] GoEasy WebSocket error:', error)
+    }
+  } catch (e) {
+    console.error('[ReviewLog] Failed to create GoEasy WebSocket:', e)
+  }
 }
 
 const MESSAGE_LISTENER_INIT_FLAG = '__review_log_message_listener_initialized__'
@@ -334,9 +419,14 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
     }
 
     if (msg.type === 'mobile:connect') {
-      const config = msg as { type: 'mobile:connect'; serverUrl: string }
-      startMobilePolling(config.serverUrl)
-      chrome.runtime.sendMessage({ type: 'mobile:connected', serverUrl: config.serverUrl })
+      const config = msg as { type: 'mobile:connect'; serverUrl: string; mode?: string; goeasyConfig?: GoEasyConfig }
+      
+      if (config.mode === 'goeasy' && config.goeasyConfig) {
+        startGoEasyConnection(config.goeasyConfig)
+      } else {
+        startMobilePolling(config.serverUrl)
+        chrome.runtime.sendMessage({ type: 'mobile:connected', serverUrl: config.serverUrl, mode: 'self-hosted' })
+      }
       return false
     }
 
@@ -350,8 +440,9 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       try {
         chrome.runtime.sendMessage({
           type: 'mobile:status',
-          connected: !!mobileServerUrl,
-          serverUrl: mobileServerUrl
+          connected: !!mobileServerUrl || goEasyConnected,
+          serverUrl: mobileServerUrl || (goEasyConnected ? 'goeasy' : ''),
+          mode: goEasyConnected ? 'goeasy' : 'self-hosted'
         })
       } catch {
         /* no listeners */

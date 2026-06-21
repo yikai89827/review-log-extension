@@ -133,29 +133,82 @@ function createServer() {
 
   const wss = new WebSocket.Server({ server, path: '/ws' })
 
-  wss.on('connection', (ws) => {
+  console.log('[DEBUG] WebSocket server created with path: /ws')
+  console.log('[DEBUG] Waiting for clients to connect...')
+
+  wss.on('connection', (ws, req) => {
+    console.log('\n[DEBUG] New WebSocket connection attempt detected')
+    console.log('[DEBUG] Request URL:', req.url)
+    
+    const clientIP = req.socket.remoteAddress
+    const clientPort = req.socket.remotePort
+    const queryParams = new URLSearchParams(req.url.split('?')[1])
+    const deviceId = queryParams.get('deviceId') || 'unknown'
+    const deviceType = queryParams.get('deviceType') || 'unknown'
+    
     clients.add(ws)
-    console.log('Client connected')
+    console.log('\n========================================')
+    console.log('[CONNECT] Client connected')
+    console.log('----------------------------------------')
+    console.log(`IP:          ${clientIP}:${clientPort}`)
+    console.log(`Device ID:   ${deviceId}`)
+    console.log(`Device Type: ${deviceType}`)
+    console.log(`Total clients: ${clients.size}`)
+    console.log('========================================')
+
+    // 发送连接确认
+    ws.send(JSON.stringify({ 
+      type: 'connected', 
+      sessionId: `${deviceId}-${Date.now()}`,
+      message: 'Connected to Review Log Server'
+    }))
 
     ws.on('message', (message) => {
+      console.log('\n[DEBUG] Message received from client')
+      console.log('[DEBUG] Message length:', message.length, 'bytes')
+      
       try {
         const data = JSON.parse(message)
         addLog(data)
-        console.log(`[${data.deviceType}] ${data.type}: ${data.payload?.text?.slice(0, 100)}...`)
+        const logLevel = data.payload?.level || 'log'
+        const textPreview = data.payload?.text?.slice(0, 100) || JSON.stringify(data).slice(0, 100)
+        console.log('[MSG] Device:', data.deviceType || 'unknown', '- Level:', logLevel.toUpperCase())
+        console.log('[MSG] Content:', textPreview + (data.payload?.text && data.payload.text.length > 100 ? '...' : ''))
       } catch (e) {
-        console.error('Invalid message:', e)
+        console.error('\n[ERROR] Failed to parse message')
+        console.error('[ERROR] Error:', e.message)
+        console.error('[ERROR] Raw message:', message.toString().slice(0, 200))
       }
     })
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       clients.delete(ws)
-      console.log('Client disconnected')
+      console.log('\n========================================')
+      console.log('[DISCONNECT] Client disconnected')
+      console.log('----------------------------------------')
+      console.log(`IP:          ${clientIP}:${clientPort}`)
+      console.log(`Code:        ${code}`)
+      console.log(`Reason:      ${reason.toString()}`)
+      console.log(`Total clients: ${clients.size}`)
+      console.log('========================================')
     })
 
     ws.on('error', (error) => {
-      console.error('WebSocket error:', error)
+      console.error('\n========================================')
+      console.error('[ERROR] WebSocket error')
+      console.error('----------------------------------------')
+      console.error('Client:', clientIP)
+      console.error('Error:', error)
+      console.error('========================================')
     })
   })
+
+  // 监听服务器错误
+  wss.on('error', (error) => {
+    console.error('[SERVER ERROR] WebSocket server error:', error)
+  })
+
+  console.log(`WebSocket server initialized on /ws path`)
 
   return server
 }
@@ -163,16 +216,20 @@ function createServer() {
 const server = createServer()
 const ips = getLocalIPs()
 
+console.log('[DEBUG] Server initialization started')
+console.log('[DEBUG] Port:', PORT)
+console.log('[DEBUG] Local IPs:', ips)
+
 server.listen(PORT, () => {
   console.log('\n========================================')
   console.log('Review Log Mobile Debug Server Started')
   console.log('========================================')
-  console.log(`\nServer running on port ${PORT}`)
-  console.log('\nMobile devices can connect to:')
+  console.log(`\n✅ Server running on port ${PORT}`)
+  console.log('\n📱 Mobile devices can connect to:')
   ips.forEach(ip => {
     console.log(`  • ws://${ip}:${PORT}/ws`)
   })
-  console.log('\nHTTP endpoints:')
+  console.log('\n🌐 HTTP endpoints:')
   console.log(`  • http://localhost:${PORT}/logs (GET/POST)`)
   console.log(`  • http://localhost:${PORT}/clear`)
   console.log(`  • http://localhost:${PORT}/count`)
