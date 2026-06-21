@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 
 import "./MobileSettingsPanel.css"
+import { getMobileConfig, type MobileConfig } from "../../utils/mobileConfig"
 
 interface Props {
   onClose: () => void
@@ -9,11 +10,14 @@ interface Props {
 type ConnectionMode = "self-hosted" | "goeasy"
 
 export default function MobileSettingsPanel({ onClose }: Props) {
-  const [connectionMode, setConnectionMode] = useState<ConnectionMode>("self-hosted")
-  const [serverUrl, setServerUrl] = useState("")
-  const [goeasyHost, setGoeasyHost] = useState("hangzhou.goeasy.io")
-  const [goeasyAppkey, setGoeasyAppkey] = useState("")
-  const [goeasyChannel, setGoeasyChannel] = useState("review-log-channel")
+  // 从环境配置获取默认值
+  const envConfig = getMobileConfig()
+  
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>(envConfig.defaultMode)
+  const [serverUrl, setServerUrl] = useState(envConfig.selfHosted.serverUrl)
+  const [goeasyHost, setGoeasyHost] = useState(envConfig.goeasy.host)
+  const [goeasyAppkey, setGoeasyAppkey] = useState(envConfig.goeasy.appkey)
+  const [goeasyChannel, setGoeasyChannel] = useState(envConfig.goeasy.channel)
   const [connected, setConnected] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +31,7 @@ export default function MobileSettingsPanel({ onClose }: Props) {
         if (message.mode === "goeasy") {
           setConnectionMode("goeasy")
         } else {
-          setServerUrl(message.serverUrl || "")
+          setServerUrl(message.serverUrl || serverUrl)
         }
       }
     }
@@ -118,6 +122,10 @@ export default function MobileSettingsPanel({ onClose }: Props) {
     chrome.runtime.onMessage.addListener(handleDisconnected)
   }
 
+  // 检查是否有预配置
+  const hasSelfHostedConfig = !!envConfig.selfHosted.serverUrl
+  const hasGoEasyConfig = !!envConfig.goeasy.appkey && !!envConfig.goeasy.host && !!envConfig.goeasy.channel
+
   return (
     <div className="mobile-settings-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mobile-settings-panel">
@@ -140,6 +148,7 @@ export default function MobileSettingsPanel({ onClose }: Props) {
                 disabled={connected}
               >
                 自建服务器
+                {hasSelfHostedConfig && <span className="config-badge">已配置</span>}
               </button>
               <button
                 className={`mode-option ${connectionMode === "goeasy" ? "active" : ""}`}
@@ -147,6 +156,7 @@ export default function MobileSettingsPanel({ onClose }: Props) {
                 disabled={connected}
               >
                 GoEasy
+                {hasGoEasyConfig && <span className="config-badge">已配置</span>}
               </button>
             </div>
           </div>
