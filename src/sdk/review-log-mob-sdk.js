@@ -326,6 +326,220 @@
     })
   }
 
+  function createFloatingPanel() {
+    var panel = document.createElement('div')
+    panel.id = 'review-log-config-panel'
+    panel.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 300px;
+      background: rgba(15, 15, 15, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      padding: 16px;
+      z-index: 999999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #fff;
+    `
+
+    var header = document.createElement('div')
+    header.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    `
+
+    var title = document.createElement('span')
+    title.textContent = '📱 Review Log'
+    title.style.fontSize = '14px'
+    title.style.fontWeight = '600'
+    header.appendChild(title)
+
+    var closeBtn = document.createElement('button')
+    closeBtn.textContent = '×'
+    closeBtn.style.cssText = `
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `
+    closeBtn.onclick = function() {
+      panel.style.display = 'none'
+    }
+    header.appendChild(closeBtn)
+    panel.appendChild(header)
+
+    var hostInput = document.createElement('input')
+    hostInput.type = 'text'
+    hostInput.placeholder = 'WebSocket 服务器地址'
+    hostInput.value = config.host || ''
+    hostInput.style.cssText = `
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      font-size: 13px;
+      box-sizing: border-box;
+    `
+    hostInput.onfocus = function() {
+      this.style.borderColor = '#6366f1'
+    }
+    hostInput.onblur = function() {
+      this.style.borderColor = 'rgba(255,255,255,0.2)'
+    }
+    panel.appendChild(hostInput)
+
+    var connectBtn = document.createElement('button')
+    connectBtn.textContent = isConnected ? '断开连接' : '连接'
+    connectBtn.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: ${isConnected ? '#ef4444' : '#6366f1'};
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 12px;
+    `
+    connectBtn.onclick = function() {
+      if (isConnected) {
+        disconnect()
+        connectBtn.textContent = '连接'
+        connectBtn.style.background = '#6366f1'
+        statusText.textContent = '已断开'
+        statusText.style.color = '#9ca3af'
+      } else {
+        var host = hostInput.value.trim()
+        if (!host) {
+          alert('请输入服务器地址')
+          return
+        }
+        setHost(host)
+        connectBtn.textContent = '连接中...'
+        connectBtn.style.background = '#4b5563'
+        connectBtn.disabled = true
+      }
+    }
+    panel.appendChild(connectBtn)
+
+    var statusText = document.createElement('div')
+    statusText.textContent = isConnected ? '已连接' : '未连接'
+    statusText.style.cssText = `
+      font-size: 12px;
+      color: ${isConnected ? '#22c55e' : '#9ca3af'};
+      text-align: center;
+      margin-bottom: 8px;
+    `
+    panel.appendChild(statusText)
+
+    var deviceIdText = document.createElement('div')
+    deviceIdText.textContent = '设备ID: ' + (deviceId || '未初始化')
+    deviceIdText.style.cssText = `
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+      word-break: break-all;
+    `
+    panel.appendChild(deviceIdText)
+
+    var toggleBtn = document.createElement('button')
+    toggleBtn.textContent = '隐藏面板'
+    toggleBtn.style.cssText = `
+      width: 100%;
+      padding: 6px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      background: transparent;
+      color: #9ca3af;
+      font-size: 11px;
+      cursor: pointer;
+      margin-top: 8px;
+    `
+    toggleBtn.onclick = function() {
+      panel.style.display = 'none'
+      showToggleBtn()
+    }
+    panel.appendChild(toggleBtn)
+
+    document.body.appendChild(panel)
+
+    // 监听连接状态变化
+    function updateStatus() {
+      if (isConnected) {
+        connectBtn.textContent = '断开连接'
+        connectBtn.style.background = '#ef4444'
+        statusText.textContent = '已连接'
+        statusText.style.color = '#22c55e'
+      } else {
+        connectBtn.textContent = '连接'
+        connectBtn.style.background = '#6366f1'
+        statusText.textContent = '未连接'
+        statusText.style.color = '#9ca3af'
+      }
+      connectBtn.disabled = false
+    }
+
+    // 重写 connect 函数以更新状态
+    var originalConnect = connect
+    connect = function() {
+      originalConnect()
+      setTimeout(updateStatus, 100)
+    }
+
+    // 重写 disconnect 函数以更新状态
+    var originalDisconnect = disconnect
+    disconnect = function() {
+      originalDisconnect()
+      updateStatus()
+    }
+
+    // 显示切换按钮
+    function showToggleBtn() {
+      var toggle = document.getElementById('review-log-toggle-btn')
+      if (!toggle) {
+        toggle = document.createElement('button')
+        toggle.id = 'review-log-toggle-btn'
+        toggle.textContent = '📱'
+        toggle.style.cssText = `
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          width: 48px;
+          height: 48px;
+          border: none;
+          border-radius: 50%;
+          background: #6366f1;
+          color: #fff;
+          font-size: 20px;
+          cursor: pointer;
+          box-shadow: 0 2px 12px rgba(99, 102, 241, 0.4);
+          z-index: 999998;
+        `
+        toggle.onclick = function() {
+          panel.style.display = 'block'
+          toggle.remove()
+        }
+        document.body.appendChild(toggle)
+      }
+    }
+  }
+
   var sdk = {
     init: init,
     setHost: setHost,
@@ -346,6 +560,10 @@
     }
     if (params.has('debug')) {
       config.debug = true
+    }
+    // 显示配置面板（默认显示，除非通过参数隐藏）
+    if (!params.has('hidePanel')) {
+      setTimeout(createFloatingPanel, 500)
     }
   }
 

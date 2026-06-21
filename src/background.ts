@@ -158,7 +158,7 @@ function startMobilePolling(url: string) {
   } else {
     // 使用旧的 HTTP polling 方式
     fetchMobileLogs(url)
-    pollingInterval = window.setInterval(() => {
+    pollingInterval = setInterval(() => {
       fetchMobileLogs(url)
     }, 2000)
   }
@@ -227,7 +227,7 @@ function startWebSocketConnection(url: string) {
     console.error('[ReviewLog] Failed to create WebSocket:', e)
     // 回退到 HTTP polling
     fetchMobileLogs(url)
-    pollingInterval = window.setInterval(() => {
+    pollingInterval = setInterval(() => {
       fetchMobileLogs(url)
     }, 2000)
   }
