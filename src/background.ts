@@ -141,6 +141,7 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       try {
         chrome.runtime.sendMessage({
           type: "log:request-history-response",
+          tabId,
           entries,
           actions: act,
           networks: net

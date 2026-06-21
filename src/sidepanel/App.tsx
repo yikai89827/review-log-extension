@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 
 import {
   buildJsonExport,
@@ -48,6 +48,16 @@ function findRelatedSelector(rows: DisplayRow[], beforeTs: number, tabId?: numbe
   return undefined
 }
 
+function rowTabId(tabId?: number | string): number | undefined {
+  if (tabId == null) return undefined
+  return typeof tabId === "number" ? tabId : Number(tabId)
+}
+
+function belongsToTab(entryTabId: number | string | undefined, activeTabId: number | null): boolean {
+  if (activeTabId == null) return false
+  return rowTabId(entryTabId) === activeTabId
+}
+
 export default function App() {
   const [rows, setRows] = useState<DisplayRow[]>([])
   const [filter, setFilter] = useState<FilterType>("all")
@@ -62,6 +72,8 @@ export default function App() {
   const [copyToast, setCopyToast] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
+  const activeTabIdRef = useRef<number | null>(null)
+
   const [aiConfig, setAiConfig] = useState<AiConfig>(loadConfig())
 
   useEffect(() => {
@@ -74,13 +86,19 @@ export default function App() {
   }, [])
 
   const handleMessage = useCallback((msg: RuntimeMessage) => {
+    const activeTabId = activeTabIdRef.current
+
     if (msg.type === "log:append") {
+      if (!belongsToTab(msg.entry.tabId, activeTabId)) return
       setRows((prev) => pushLog(prev, msg.entry))
     } else if (msg.type === "action:append") {
+      if (!belongsToTab(msg.event.tabId, activeTabId)) return
       setRows((prev) => pushAction(prev, msg.event))
     } else if (msg.type === "network:append") {
+      if (!belongsToTab(msg.request.tabId, activeTabId)) return
       setRows((prev) => pushNetwork(prev, msg.request))
     } else if (msg.type === "log:request-history-response") {
+      if (!belongsToTab(msg.tabId, activeTabId)) return
       resetLogDedupe()
       let next: DisplayRow[] = []
       for (const e of msg.entries) next = pushLog(next, e)
@@ -185,7 +203,8 @@ export default function App() {
     const loadTabHistory = async () => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       const activeTab = tabs[0]
-      if (activeTab?.id) {
+      if (activeTab?.id != null) {
+        activeTabIdRef.current = activeTab.id
         resetLogDedupe()
         setRows([])
         safeRuntimeSendMessage({ type: "log:request-history", tabId: activeTab.id })
@@ -278,8 +297,8 @@ export default function App() {
           sortedRows.map((row) => {
             if (row.kind === "log") {
               const ts = row.lastTs
-              const relatedSelector = findRelatedSelector(rows, ts, row.tabId)
-              const relatedNetwork = findRelatedNetwork(rows, ts, row.tabId)
+              const relatedSelector = findRelatedSelector(rows, ts, rowTabId(row.tabId))
+              const relatedNetwork = findRelatedNetwork(rows, ts, rowTabId(row.tabId))
               return (
                 <LogRow
                   key={row.id}

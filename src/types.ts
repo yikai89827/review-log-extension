@@ -119,6 +119,7 @@ export type RuntimeMessage =
   | { type: "log:request-history"; tabId: number | string }
   | {
       type: "log:request-history-response"
+      tabId: number | string
       entries: LogEntry[]
       actions: PageActionEvent[]
       networks: NetworkRequestEvent[]
