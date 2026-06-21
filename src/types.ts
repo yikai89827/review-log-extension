@@ -6,6 +6,8 @@ export interface LogEntry {
   id?: string
   /** Unique id from inject script; used to dedupe across HMR / double listeners */
   eventId?: string
+  /** Stable key for input value dedupe (one row per input element) */
+  inputKey?: string
   seq: number
   level: LogLevel
   args: SerializedArg[]
@@ -49,6 +51,24 @@ export interface PageActionEvent {
   eventId?: string
 }
 
+export interface NetworkRequestEvent {
+  eventId?: string
+  method: string
+  url: string
+  status?: number
+  duration?: number
+  ts: number
+  tabId?: number | string
+}
+
+export interface DomHighlightPayload {
+  selector?: string
+  tagHint?: string
+  line?: number
+  column?: number
+  url?: string
+}
+
 export interface InjectToContentMessage {
   source: "review-log-inject"
   payload: LogEntry
@@ -57,6 +77,11 @@ export interface InjectToContentMessage {
 export interface InjectEventMessage {
   source: "review-log-inject-event"
   payload: PageActionEvent
+}
+
+export interface InjectNetworkMessage {
+  source: "review-log-inject-network"
+  payload: NetworkRequestEvent
 }
 
 export interface LogForwardMessage {
@@ -74,12 +99,30 @@ export interface PageActionForwardMessage {
   event: PageActionEvent & { tabId: number | string }
 }
 
+export interface NetworkForwardMessage {
+  type: "network:append"
+  request: NetworkRequestEvent & { tabId: number | string }
+}
+
+export interface DomHighlightMessage {
+  type: "log:highlight-dom"
+  tabId: number
+  payload: DomHighlightPayload
+}
+
 export type RuntimeMessage =
   | LogForwardMessage
   | LogClearMessage
   | PageActionForwardMessage
+  | NetworkForwardMessage
+  | DomHighlightMessage
   | { type: "log:request-history"; tabId: number | string }
-  | { type: "log:request-history-response"; entries: LogEntry[]; actions: PageActionEvent[] }
+  | {
+      type: "log:request-history-response"
+      entries: LogEntry[]
+      actions: PageActionEvent[]
+      networks: NetworkRequestEvent[]
+    }
   | { type: "log:open-panel"; tabId?: number }
   | { type: "log:config"; config: AiConfig }
   | { type: "log:ai-result"; requestId: string; result: AiResult }

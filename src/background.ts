@@ -1,7 +1,7 @@
 // Background service worker: receives log/action from content scripts,
 // tags with tab id, keeps ring buffer, forwards to side panel.
 
-import type { LogEntry, PageActionEvent, RuntimeMessage } from "./types"
+import type { LogEntry, NetworkRequestEvent, PageActionEvent, RuntimeMessage } from "./types"
 
 import { saveLog, saveAction, deleteLogsByTabId } from "./utils/indexedDB"
 
@@ -11,6 +11,7 @@ const MAX_SEEN_EVENT_IDS = 5000
 const seqByTab = new Map<number, number>()
 const history = new Map<number, LogEntry[]>()
 const actions = new Map<number, (PageActionEvent & { tabId?: number })[]>()
+const networks = new Map<number, (NetworkRequestEvent & { tabId?: number })[]>()
 const seenEventIds = new Set<string>()
 
 function rememberEventId(eventId: string | undefined): boolean {
@@ -46,9 +47,17 @@ function appendAction(event: PageActionEvent & { tabId?: number }, tabId: number
   actions.set(tabId, list)
 }
 
+function appendNetwork(request: NetworkRequestEvent & { tabId?: number }, tabId: number) {
+  const list = networks.get(tabId) ?? []
+  list.push({ ...request, tabId })
+  if (list.length > MAX_ENTRIES_PER_TAB) list.splice(0, list.length - MAX_ENTRIES_PER_TAB)
+  networks.set(tabId, list)
+}
+
 function clearKey(tabId: number) {
   history.set(tabId, [])
   actions.set(tabId, [])
+  networks.set(tabId, [])
   seqByTab.set(tabId, 0)
 }
 
@@ -100,6 +109,24 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       return false
     }
 
+    if (msg.type === "network:append") {
+      const tabId = sender.tab?.id ?? msg.request.tabId ?? -1
+      if (typeof tabId !== "number" || tabId < 0) return false
+      if (rememberEventId(msg.request.eventId)) return false
+      const request = { ...msg.request, tabId }
+      appendNetwork(request, tabId)
+      void broadcast({ type: "network:append", request })
+      return false
+    }
+
+    if (msg.type === "log:highlight-dom") {
+      const tabId = msg.tabId
+      chrome.tabs.sendMessage(tabId, msg).catch(() => {
+        /* tab may not have content script */
+      })
+      return false
+    }
+
     if (msg.type === "log:clear") {
       clearKey(msg.tabId as number)
       void deleteLogsByTabId(msg.tabId)
@@ -110,11 +137,13 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       const tabId = msg.tabId as number
       const entries = history.get(tabId) ?? []
       const act = actions.get(tabId) ?? []
+      const net = networks.get(tabId) ?? []
       try {
         chrome.runtime.sendMessage({
           type: "log:request-history-response",
           entries,
-          actions: act
+          actions: act,
+          networks: net
         })
       } catch {
         /* no listeners */
@@ -143,6 +172,7 @@ chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() =>
 chrome.tabs.onRemoved.addListener((tabId) => {
   history.delete(tabId)
   actions.delete(tabId)
+  networks.delete(tabId)
   seqByTab.delete(tabId)
   void deleteLogsByTabId(tabId)
 })

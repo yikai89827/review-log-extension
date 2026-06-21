@@ -6,10 +6,14 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import type {
-  InjectToContentMessage,
+  DomHighlightPayload,
+  DomNode,
   InjectEventMessage,
+  InjectNetworkMessage,
+  InjectToContentMessage,
   LogEntry,
   LogLevel,
+  NetworkRequestEvent,
   PageActionEvent,
   SerializedArg
 } from "../types"
@@ -20,6 +24,9 @@ export const config: PlasmoCSConfig = {
 }
 
 const HANDSHAKE = "review-log-inject"
+const HANDSHAKE_EVENT = `${HANDSHAKE}-event`
+const HANDSHAKE_NETWORK = `${HANDSHAKE}-network`
+const HANDSHAKE_HIGHLIGHT = `${HANDSHAKE}-highlight`
 const WINDOW_INIT_FLAG = "__review_log_main_injected__"
 const WRAPPED_FLAG = "__review_log_wrapped__"
 
@@ -214,6 +221,157 @@ if (isAlreadyInjected) {
     }
   }
 
+  function postInputLog(t: HTMLInputElement | HTMLTextAreaElement) {
+    const inputKey = describeTarget(t) || t.tagName.toLowerCase()
+    const label = t.placeholder || t.name || t.id || "input"
+    const text = `[${label}]: ${t.value}`
+    const entry: LogEntry = {
+      ...makeEntry("log", [text]),
+      inputKey
+    }
+    const msg: InjectToContentMessage = { source: HANDSHAKE, payload: entry }
+    try {
+      window.postMessage(msg, window.location.origin)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function postNetwork(request: Omit<NetworkRequestEvent, "eventId" | "ts"> & { ts?: number }) {
+    const payload: NetworkRequestEvent = {
+      eventId: nextEventId(),
+      method: request.method,
+      url: request.url,
+      status: request.status,
+      duration: request.duration,
+      ts: request.ts ?? Date.now()
+    }
+    const msg: InjectNetworkMessage = { source: HANDSHAKE_NETWORK, payload }
+    try {
+      window.postMessage(msg, window.location.origin)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  let lastInteractionTarget: string | undefined
+
+  function findElementByDescribeTarget(desc: string): Element | null {
+    const idMatch = desc.match(/^(\w+)(#[\w-]+)/)
+    if (idMatch) {
+      const el = document.querySelector(`${idMatch[1]}${idMatch[2]}`)
+      if (el) return el
+    }
+
+    const textMatch = desc.match(/^(\w+)\s+"([^"]+)/)
+    if (textMatch) {
+      const [, tag, textPrefix] = textMatch
+      for (const el of document.querySelectorAll(tag)) {
+        const txt = el.textContent?.trim() ?? ""
+        if (txt.startsWith(textPrefix.replace(/\.\.\.$/, ""))) return el
+      }
+    }
+
+    const clsMatch = desc.match(/^(\w+)(\.[\w.-]+)/)
+    if (clsMatch) {
+      const el = document.querySelector(`${clsMatch[1]}${clsMatch[2]}`)
+      if (el) return el
+    }
+
+    return null
+  }
+
+  function flashElement(el: Element): boolean {
+    const htmlEl = el as HTMLElement
+    htmlEl.scrollIntoView({ block: "center", behavior: "smooth" })
+    const prevOutline = htmlEl.style.outline
+    const prevOffset = htmlEl.style.outlineOffset
+    htmlEl.style.outline = "3px solid #6366f1"
+    htmlEl.style.outlineOffset = "2px"
+    setTimeout(() => {
+      htmlEl.style.outline = prevOutline
+      htmlEl.style.outlineOffset = prevOffset
+    }, 2500)
+    try {
+      // DevTools-only in page console; no-op in extension context but harmless
+      ;(window as unknown as { inspect?: (n: Element) => void }).inspect?.(el)
+    } catch {
+      /* ignore */
+    }
+    return true
+  }
+
+  function highlightDom(payload: DomHighlightPayload): boolean {
+    if (payload.selector) {
+      const el = findElementByDescribeTarget(payload.selector)
+      if (el) return flashElement(el)
+    }
+
+    if (payload.tagHint) {
+      const candidates = document.querySelectorAll(payload.tagHint)
+      if (candidates.length === 1) return flashElement(candidates[0])
+      if (payload.tagHint === "button") {
+        const withOnclick = document.querySelectorAll("button[onclick], [onclick]")
+        if (withOnclick.length === 1) return flashElement(withOnclick[0])
+      }
+    }
+
+    if (lastInteractionTarget) {
+      const el = findElementByDescribeTarget(lastInteractionTarget)
+      if (el) return flashElement(el)
+    }
+
+    return false
+  }
+
+  function captureNetwork() {
+    const origFetch = window.fetch.bind(window)
+    window.fetch = async function (...args: Parameters<typeof fetch>) {
+      const start = Date.now()
+      const input = args[0]
+      const init = args[1]
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url
+      const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase()
+      try {
+        const res = await origFetch(...args)
+        postNetwork({ method, url, status: res.status, duration: Date.now() - start })
+        return res
+      } catch (err) {
+        postNetwork({ method, url, status: 0, duration: Date.now() - start })
+        throw err
+      }
+    }
+
+    const XHR = XMLHttpRequest.prototype
+    const origOpen = XHR.open
+    const origSend = XHR.send
+    XHR.open = function (method: string, url: string | URL, ...rest: unknown[]) {
+      ;(this as unknown as { __rlMethod: string }).__rlMethod = method.toUpperCase()
+      ;(this as unknown as { __rlUrl: string }).__rlUrl = String(url)
+      return origOpen.call(this, method, url, ...(rest as [boolean?, string?, string?]))
+    }
+    XHR.send = function (...sendArgs: unknown[]) {
+      const start = Date.now()
+      const xhr = this as XMLHttpRequest & { __rlMethod?: string; __rlUrl?: string }
+      xhr.addEventListener("loadend", () => {
+        postNetwork({
+          method: xhr.__rlMethod ?? "GET",
+          url: xhr.__rlUrl ?? "",
+          status: xhr.status || 0,
+          duration: Date.now() - start
+        })
+      })
+      return origSend.apply(this, sendArgs as [Document | XMLHttpRequestBodyInit | null | undefined])
+    }
+  }
+
+  captureNetwork()
+
   // Check if console has already been wrapped
   if (!consoleObj[WRAPPED_FLAG]) {
     consoleObj[WRAPPED_FLAG] = true
@@ -362,6 +520,7 @@ if (isAlreadyInjected) {
         }
         
         postAction("click", describeTarget(t))
+        lastInteractionTarget = describeTarget(t)
       },
       true
     )
@@ -375,13 +534,12 @@ if (isAlreadyInjected) {
         // Only send action once per input element focus session
         if (!inputActionSent.has(t)) {
           inputActionSent.add(t)
-          postAction("input", describeTarget(t))
+          const target = describeTarget(t)
+          postAction("input", target)
+          lastInteractionTarget = target
         }
-        
-        // Log current value via console so it appears as a log entry
-        const value = t.value
-        const label = t.placeholder || t.name || t.id || 'input'
-        originalConsoleMethods.log(`[${label}]: ${value}`)
+
+        postInputLog(t)
       },
       true
     )
@@ -422,6 +580,14 @@ if (isAlreadyInjected) {
     )
 
   }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return
+    const data = event.data as { source?: string; payload?: DomHighlightPayload } | undefined
+    if (data?.source === HANDSHAKE_HIGHLIGHT && data.payload) {
+      highlightDom(data.payload)
+    }
+  })
 
   window.postMessage({ source: `${HANDSHAKE}-ready` }, window.location.origin)
 }

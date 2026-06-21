@@ -66,4 +66,18 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
+  text-align: left;
+}
+
+.action-target-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(148, 163, 184, 0.45);
+}
+
+.action-target-btn:hover {
+  color: #c7d2fe;
 }

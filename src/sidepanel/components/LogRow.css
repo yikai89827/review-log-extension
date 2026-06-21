@@ -79,11 +79,30 @@
   word-break: break-word;
 }
 
-.row-text pre {
+.row-text {
   margin: 0;
   font-family: inherit;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  max-width: 100%;
+}
+
+.error-block {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.related-network {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #6ee7b7;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.log-row-input .row-text {
+  color: #93c5fd;
 }
 
 .row-args {

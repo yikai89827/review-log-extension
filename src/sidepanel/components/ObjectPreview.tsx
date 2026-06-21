@@ -1,11 +1,13 @@
 import { useState } from "react"
 import type { SerializedArg, DomNode } from "../../types"
+import StackTrace from "./StackTrace"
 import "./ObjectPreview.css"
 
 interface Props {
   value: SerializedArg
   defaultExpanded?: boolean
   depth?: number
+  relatedSelector?: string
 }
 
 function formatValue(value: SerializedArg): string {
@@ -78,21 +80,12 @@ function getTypeColor(value: SerializedArg): string {
   }
 }
 
-function isExpandable(value: SerializedArg): boolean {
-  if (value.kind === "object" && typeof value.value === "object" && value.value !== null && Object.keys(value.value).length > 0) {
-    return true
-  }
-  if (value.kind === "dom" && value.value.children.length > 0) {
-    return true
-  }
-  return false
-}
-
 interface EntryProps {
   keyName: string | number | null
   value: SerializedArg
   depth: number
   defaultExpanded: boolean
+  relatedSelector?: string
 }
 
 function formatDomNode(node: DomNode): string {
@@ -161,7 +154,7 @@ function DomEntry({ node, depth, defaultExpanded }: { node: DomNode; depth: numb
   )
 }
 
-function Entry({ keyName, value, depth, defaultExpanded }: EntryProps) {
+function Entry({ keyName, value, depth, defaultExpanded, relatedSelector }: EntryProps) {
   const [expanded, setExpanded] = useState(depth === 0 && defaultExpanded)
   const expandable = isExpandable(value)
   const typeColor = getTypeColor(value)
@@ -206,7 +199,7 @@ function Entry({ keyName, value, depth, defaultExpanded }: EntryProps) {
         </div>
         {expandable && expanded && value.stack && (
           <div className="entry-children">
-            <pre className="error-stack">{value.stack}</pre>
+            <StackTrace stack={value.stack} relatedSelector={relatedSelector} />
           </div>
         )}
       </div>
@@ -260,6 +253,14 @@ function Entry({ keyName, value, depth, defaultExpanded }: EntryProps) {
   )
 }
 
-export default function ObjectPreview({ value, defaultExpanded = true, depth = 0 }: Props) {
-  return <Entry keyName={null} value={value} depth={depth} defaultExpanded={defaultExpanded} />
+export default function ObjectPreview({ value, defaultExpanded = true, depth = 0, relatedSelector }: Props) {
+  return (
+    <Entry
+      keyName={null}
+      value={value}
+      depth={depth}
+      defaultExpanded={defaultExpanded}
+      relatedSelector={relatedSelector}
+    />
+  )
 }

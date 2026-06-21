@@ -1,0 +1,64 @@
+.network-row {
+  display: grid;
+  grid-template-columns: 60px 52px minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(16, 185, 129, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+
+.network-row .row-time {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+}
+
+.network-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 4px;
+  padding: 1px 4px;
+  align-self: start;
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+}
+
+.network-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.network-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #a7f3d0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.network-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.net-status-ok {
+  color: #6ee7b7;
+}
+
+.net-status-warn {
+  color: #fde68a;
+}
+
+.net-status-error {
+  color: #fca5a5;
+}
+
+.net-duration {
+  color: rgba(255, 255, 255, 0.45);
+}
