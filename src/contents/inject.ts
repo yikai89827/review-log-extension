@@ -514,6 +514,11 @@ if (isAlreadyInjected) {
       (e) => {
         const t = e.target
         if (!(t instanceof Element)) return
+
+        // input/textarea 已有 input 动作与值日志，默认不记录 click
+        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
+          return
+        }
         
         if (!hasEventListeners(t, 'click')) {
           return
