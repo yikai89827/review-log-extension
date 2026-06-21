@@ -38,11 +38,34 @@ export function nextId(): string {
   return `${Date.now().toString(36)}-${_id.toString(36)}`
 }
 
+const seenLogKeys = new Set<string>()
+const seenActionKeys = new Set<string>()
+
+function logDedupeKey(entry: LogEntry): string {
+  return `${entry.tabId ?? -1}:${entry.seq}`
+}
+
+function actionDedupeKey(event: PageActionEvent & { tabId?: number }): string {
+  return `${event.tabId ?? -1}:${event.action}:${event.target ?? ""}:${event.ts}`
+}
+
+/** Clear dedupe cache (on clear / history reload). */
+export function resetLogDedupe(): void {
+  seenLogKeys.clear()
+  seenActionKeys.clear()
+}
+
 /**
  * Push a new log entry into a row list, merging with the previous row if it
  * is a log with the same key.
  */
 export function pushLog(rows: DisplayRow[], entry: LogEntry): DisplayRow[] {
+  if (entry.seq > 0) {
+    const dedupeKey = logDedupeKey(entry)
+    if (seenLogKeys.has(dedupeKey)) return rows
+    seenLogKeys.add(dedupeKey)
+  }
+
   const key = logKey(entry)
   const last = rows[rows.length - 1]
   if (last && last.kind === "log" && logKey({ ...last, seq: 0 }) === key && last.tabId === entry.tabId) {
@@ -73,6 +96,10 @@ export function pushAction(
   rows: DisplayRow[],
   event: PageActionEvent & { tabId?: number }
 ): DisplayRow[] {
+  const dedupeKey = actionDedupeKey(event)
+  if (seenActionKeys.has(dedupeKey)) return rows
+  seenActionKeys.add(dedupeKey)
+
   return [
     ...rows,
     {

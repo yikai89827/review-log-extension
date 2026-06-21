@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Review Log · 调试测试页</title>
-  <script src="./review-log-mob-sdk.js?host=198.168.254.58:8088"></script>
+  <!-- <script src="./review-log-mob-sdk.js?host=192.168.254.58:8088"></script> -->
   <style>
     body {
       font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -52,7 +52,8 @@
 <body>
   <h1>Review Log · 调试测试页</h1>
   <p>打开本页面后，扩展会自动 hook 所有 <code>console.*</code> 与用户操作。
-    点击扩展图标打开侧边栏查看事件流，再点击「✨ 一键 AI 分析」进行归因分析。</p>
+    点击扩展图标打开侧边栏查看事件流，再点击「✨ 一键 AI 分析」进行归因分析。
+    移动端日志推送请在手机页面引入 <code>review-log-mob-sdk.js</code>，PC 端扩展仅接收、不推送。</p>
 
   <div class="card">
     <h3>1. 普通日志</h3>
@@ -72,23 +73,6 @@
     <p style="color:#64748b;font-size:12px">侧边栏会显示 click / input / submit / keydown 等动作。</p>
   </div>
 
-  <div class="card">
-    <h3>4. GoEasy WebSocket 测试</h3>
-    <p>AppKey: <input type="text" id="appkey" value="BC-e65c9385836d46e2a8b408117de2fbdc" style="width:300px" /></p>
-    <p>Host: <input type="text" id="goeasyHost" value="hangzhou.goeasy.io" style="width:200px" /></p>
-    <p>频道: <input type="text" id="channel" value="review-log-channel" style="width:200px" /></p>
-    <p>消息: <input type="text" id="message" value="Hello from Review Log SDK!" style="width:300px" /></p>
-    <p>
-      <button class="btn-goeasy" onclick="initGoEasy()">初始化连接</button>
-      <span id="goeasyStatus" class="status disconnected">未连接</span>
-    </p>
-    <p>
-      <button class="btn-goeasy" onclick="subscribeChannel()">订阅频道</button>
-      <button class="btn-goeasy" onclick="publishMessage()">推送消息</button>
-      <button class="btn-goeasy" onclick="disconnectGoEasy()">断开连接</button>
-    </p>
-    <pre id="goeasyLog" style="max-height:150px"></pre>
-  </div>
 
   <pre id="out"></pre>
 
@@ -155,8 +139,8 @@
 
   function emitNormal() {
     console.log('用户点击了普通日志按钮', { ts: Date.now(), level: 'log' , text: '这是一条 log' , args: [1,2,3,4,5] })
-    console.info('这是一条 info', document.body)
-    console.warn('这是一条 warn',  document.querySelector('body'))
+    console.info('这是一条 info')
+    console.warn('这是一条 warn')
   }
 
   function emitDuplicates() {

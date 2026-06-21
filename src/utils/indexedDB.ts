@@ -3,7 +3,6 @@ import type { LogEntry, PageActionEvent } from "../types"
 const DB_NAME = "ReviewLogDB"
 const DB_VERSION = 1
 const STORE_NAME = "logs"
-const BODY_STORE_NAME = "body_content"
 
 interface StoredEntry {
   id: string
@@ -41,10 +40,6 @@ export async function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORE_NAME, { keyPath: "id" })
         store.createIndex("tabId", "tabId", { unique: false })
         store.createIndex("timestamp", "timestamp", { unique: false })
-      }
-      if (!db.objectStoreNames.contains(BODY_STORE_NAME)) {
-        const bodyStore = db.createObjectStore(BODY_STORE_NAME, { keyPath: "tabId" })
-        bodyStore.createIndex("timestamp", "timestamp", { unique: false })
       }
     }
   })
@@ -150,48 +145,4 @@ export async function getLogCount(): Promise<number> {
   })
 }
 
-// 存储 body 内容到 IndexedDB
-export async function saveBodyContent(tabId: number | string, content: string, url: string): Promise<void> {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([BODY_STORE_NAME], "readwrite")
-    const store = transaction.objectStore(BODY_STORE_NAME)
-    
-    const entry: BodyContentEntry = {
-      tabId,
-      url,
-      content,
-      timestamp: Date.now()
-    }
 
-    const request = store.put(entry)
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve()
-  })
-}
-
-// 获取 body 内容
-export async function getBodyContent(tabId: number | string): Promise<BodyContentEntry | null> {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([BODY_STORE_NAME], "readonly")
-    const store = transaction.objectStore(BODY_STORE_NAME)
-    const request = store.get(tabId)
-
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result || null)
-  })
-}
-
-// 删除 body 内容
-export async function deleteBodyContent(tabId: number | string): Promise<void> {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([BODY_STORE_NAME], "readwrite")
-    const store = transaction.objectStore(BODY_STORE_NAME)
-    const request = store.delete(tabId)
-
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve()
-  })
-}

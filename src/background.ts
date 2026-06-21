@@ -1,64 +1,42 @@
-// Background service worker. Receives log/action events from content scripts,
-// tags them with tab id, assigns monotonic sequence numbers, maintains a ring
-// buffer of recent entries per tab, and forwards to the side panel.
-// Also supports receiving logs from mobile devices via HTTP/WebSocket server.
+// Background service worker: receives log/action from content scripts,
+// tags with tab id, keeps ring buffer, forwards to side panel.
 
-import type {
-  LogEntry,
-  PageActionEvent,
-  RuntimeMessage
-} from "./types"
+import type { LogEntry, PageActionEvent, RuntimeMessage } from "./types"
 
 import { saveLog, saveAction, deleteLogsByTabId } from "./utils/indexedDB"
-import { loadMobileConfig, saveMobileConfig, type SavedMobileConfig } from "./utils/mobileStorage"
 
 const MAX_ENTRIES_PER_TAB = 2000
 
-const seqByTab = new Map<number | string, number>()
-const history = new Map<number | string, LogEntry[]>()
-const actions = new Map<number | string, (PageActionEvent & { tabId?: number | string })[]>()
+const seqByTab = new Map<number, number>()
+const history = new Map<number, LogEntry[]>()
+const actions = new Map<number, (PageActionEvent & { tabId?: number })[]>()
 
-const MOBILE_PREFIX = 'mobile_'
-
-function getMobileKey(deviceId: string): string {
-  return MOBILE_PREFIX + deviceId
-}
-
-function isMobileKey(key: number | string): boolean {
-  return typeof key === 'string' && key.startsWith(MOBILE_PREFIX)
-}
-
-function nextSeq(key: number | string): number {
-  const n = (seqByTab.get(key) ?? 0) + 1
-  seqByTab.set(key, n)
+function nextSeq(tabId: number): number {
+  const n = (seqByTab.get(tabId) ?? 0) + 1
+  seqByTab.set(tabId, n)
   return n
 }
 
-function appendLog(entry: LogEntry, key: number | string): LogEntry {
-  const tagged: LogEntry = { ...entry, seq: nextSeq(key), tabId: typeof key === 'number' ? key : -1 }
-  const list = history.get(key) ?? []
+function appendLog(entry: LogEntry, tabId: number): LogEntry {
+  const tagged: LogEntry = { ...entry, seq: nextSeq(tabId), tabId }
+  const list = history.get(tabId) ?? []
   list.push(tagged)
   if (list.length > MAX_ENTRIES_PER_TAB) list.splice(0, list.length - MAX_ENTRIES_PER_TAB)
-  history.set(key, list)
+  history.set(tabId, list)
   return tagged
 }
 
-function appendAction(event: PageActionEvent & { tabId?: number | string }, key: number | string) {
-  const list = actions.get(key) ?? []
-  list.push({ ...event, tabId: typeof key === 'number' ? key : -1 })
+function appendAction(event: PageActionEvent & { tabId?: number }, tabId: number) {
+  const list = actions.get(tabId) ?? []
+  list.push({ ...event, tabId })
   if (list.length > MAX_ENTRIES_PER_TAB) list.splice(0, list.length - MAX_ENTRIES_PER_TAB)
-  actions.set(key, list)
-  return event
+  actions.set(tabId, list)
 }
 
-function clearKey(key: number | string) {
-  history.set(key, [])
-  actions.set(key, [])
-  seqByTab.set(key, 0)
-}
-
-function getAllKeys(): (number | string)[] {
-  return Array.from(new Set([...history.keys(), ...actions.keys()]))
+function clearKey(tabId: number) {
+  history.set(tabId, [])
+  actions.set(tabId, [])
+  seqByTab.set(tabId, 0)
 }
 
 async function broadcast(msg: RuntimeMessage) {
@@ -79,360 +57,47 @@ async function openSidePanelForActiveTab() {
   }
 }
 
-interface MobileLogEntry {
-  type: string
-  deviceId: string
-  deviceType: string
-  timestamp: number
-  url: string
-  userAgent: string
-  payload: {
-    level: LogEntry['level']
-    args: LogEntry['args']
-    text: string
-    timestamp: number
-    action?: string
-    target?: string
-  }
-}
+const MESSAGE_LISTENER_INIT_FLAG = "__review_log_message_listener_initialized__"
 
-async function fetchMobileLogs(serverUrl: string): Promise<void> {
-  try {
-    const response = await fetch(`${serverUrl}/logs`)
-    if (!response.ok) {
-      console.warn('[ReviewLog] Failed to fetch mobile logs:', response.status)
-      return
-    }
-    const data = await response.json()
-    if (data.logs && Array.isArray(data.logs)) {
-      for (const entry of data.logs as MobileLogEntry[]) {
-        handleMobileEntry(entry)
-      }
-    }
-  } catch (e) {
-    console.warn('[ReviewLog] Error fetching mobile logs:', e)
-  }
-}
-
-function handleMobileEntry(entry: MobileLogEntry) {
-  const key = getMobileKey(entry.deviceId)
-  if (entry.type === 'log') {
-    const logEntry: LogEntry = {
-      seq: 0,
-      level: entry.payload.level,
-      args: entry.payload.args,
-      text: entry.payload.text,
-      ts: entry.payload.timestamp,
-      url: entry.url,
-      tabId: -1
-    }
-    const tagged = appendLog(logEntry, key)
-    broadcast({ type: 'log:append', entry: { ...tagged, tabId: key as unknown as number } })
-  } else if (entry.type === 'action') {
-    const actionEvent: PageActionEvent & { tabId?: number | string } = {
-      type: 'user-event',
-      action: entry.payload.action || 'unknown',
-      target: entry.payload.target,
-      ts: entry.payload.timestamp,
-      url: entry.url,
-      tabId: key
-    }
-    appendAction(actionEvent, key)
-    broadcast({ type: 'action:append', event: { ...actionEvent, tabId: key as unknown as number } })
-  }
-}
-
-let mobileServerUrl = ''
-let pollingInterval: number | null = null
-let mobileWebSocket: WebSocket | null = null
-let wsReconnectAttempts = 0
-const MAX_WS_RECONNECT_ATTEMPTS = 10
-const WS_RECONNECT_INTERVAL = 3000
-
-// GoEasy 相关状态
-let goEasyConnected = false
-let goEasyChannel = ''
-let currentGoEasyConfig: GoEasyConfig | null = null
-
-interface GoEasyConfig {
-  host: string
-  appkey: string
-  channel: string
-}
-
-// 当前连接模式
-let currentConnectionMode: 'self-hosted' | 'goeasy' = 'self-hosted'
-
-// 服务启动时自动加载配置并尝试连接
-chrome.runtime.onStartup.addListener(async () => {
-  await tryAutoConnect()
-})
-
-// 扩展安装/更新时也尝试自动连接
-chrome.runtime.onInstalled.addListener(async () => {
-  await tryAutoConnect()
-})
-
-// 尝试自动连接
-async function tryAutoConnect() {
-  const savedConfig = await loadMobileConfig()
-  if (savedConfig) {
-    console.log('[ReviewLog] 找到保存的配置，尝试自动连接...')
-    if (savedConfig.mode === 'goeasy') {
-      startGoEasyConnection({
-        host: savedConfig.goeasyHost,
-        appkey: savedConfig.goeasyAppkey,
-        channel: savedConfig.goeasyChannel
-      })
-    } else {
-      startMobilePolling(savedConfig.selfHostedServerUrl)
-    }
-  } else {
-    console.log('[ReviewLog] 未找到保存的配置')
-  }
-}
-
-function startMobilePolling(url: string) {
-  stopMobilePolling()
-  mobileServerUrl = url
-  
-  // 检查是否是 WebSocket URL
-  if (url.startsWith('ws://') || url.startsWith('wss://') || url.includes('workers.dev')) {
-    startWebSocketConnection(url)
-  } else {
-    // 使用旧的 HTTP polling 方式
-    fetchMobileLogs(url)
-    pollingInterval = setInterval(() => {
-      fetchMobileLogs(url)
-    }, 2000)
-  }
-}
-
-function startWebSocketConnection(url: string) {
-  if (mobileWebSocket) {
-    mobileWebSocket.close()
-  }
-  
-  // 确保 URL 格式正确
-  let wsUrl = url
-  if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
-    wsUrl = 'wss://' + wsUrl
-  }
-  
-  // 添加 deviceType 参数
-  wsUrl += '?deviceType=extension'
-  
-  try {
-    mobileWebSocket = new WebSocket(wsUrl)
-    
-    mobileWebSocket.onopen = () => {
-      wsReconnectAttempts = 0
-      console.log('[ReviewLog] WebSocket connected to', wsUrl)
-      // 通知扩展端已连接
-      broadcast({ type: 'mobile:connected', serverUrl: mobileServerUrl })
-    }
-    
-    mobileWebSocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        
-        // 处理移动端发送的日志和动作
-        if (data.type === 'log' && data.payload) {
-          handleMobileLogEntry(data)
-        } else if (data.type === 'action' && data.payload) {
-          handleMobileActionEntry(data)
-        } else if (data.type === 'connected') {
-          console.log('[ReviewLog] Server confirmed connection:', data.sessionId)
-        }
-      } catch (e) {
-        console.warn('[ReviewLog] Failed to parse WebSocket message:', e)
-      }
-    }
-    
-    mobileWebSocket.onclose = () => {
-      console.log('[ReviewLog] WebSocket disconnected')
-      broadcast({ type: 'mobile:disconnected' })
-      
-      // 自动重连
-      if (wsReconnectAttempts < MAX_WS_RECONNECT_ATTEMPTS) {
-        wsReconnectAttempts++
-        setTimeout(() => {
-          if (mobileServerUrl) {
-            startWebSocketConnection(mobileServerUrl)
-          }
-        }, WS_RECONNECT_INTERVAL * wsReconnectAttempts)
-      }
-    }
-    
-    mobileWebSocket.onerror = (error) => {
-      console.error('[ReviewLog] WebSocket error:', error)
-    }
-  } catch (e) {
-    console.error('[ReviewLog] Failed to create WebSocket:', e)
-    // 回退到 HTTP polling
-    fetchMobileLogs(url)
-    pollingInterval = setInterval(() => {
-      fetchMobileLogs(url)
-    }, 2000)
-  }
-}
-
-function handleMobileLogEntry(data: MobileLogEntry) {
-  const key = getMobileKey(data.deviceId)
-  const entry: LogEntry = {
-    seq: 0,
-    level: data.payload.level,
-    args: data.payload.args,
-    text: data.payload.text,
-    ts: data.timestamp,
-    url: data.url,
-    tabId: key as unknown as number
-  }
-  const tagged = appendLog(entry, key)
-  broadcast({ type: 'log:append', entry: tagged })
-}
-
-function handleMobileActionEntry(data: MobileLogEntry) {
-  const key = getMobileKey(data.deviceId)
-  const actionEvent: PageActionEvent = {
-    action: data.payload.action,
-    target: data.payload.target,
-    ts: data.timestamp,
-    tabId: key as unknown as number
-  }
-  appendAction(actionEvent, key)
-  broadcast({ type: 'action:append', event: { ...actionEvent, tabId: key as unknown as number } })
-}
-
-function stopMobilePolling() {
-  if (pollingInterval) {
-    clearInterval(pollingInterval)
-    pollingInterval = null
-  }
-  if (mobileWebSocket) {
-    mobileWebSocket.close()
-    mobileWebSocket = null
-  }
-  // 停止 GoEasy 连接
-  goEasyConnected = false
-  goEasyChannel = ''
-}
-
-function startGoEasyConnection(config: GoEasyConfig) {
-  stopMobilePolling()
-  goEasyChannel = config.channel
-  
-  // 构造 GoEasy WebSocket URL
-  const wsUrl = `wss://${config.host}/v2/ws?appkey=${encodeURIComponent(config.appkey)}`
-  
-  try {
-    mobileWebSocket = new WebSocket(wsUrl)
-    
-    mobileWebSocket.onopen = () => {
-      wsReconnectAttempts = 0
-      goEasyConnected = true
-      console.log('[ReviewLog] GoEasy WebSocket connected')
-      
-      // 订阅频道
-      const subscribeMsg = JSON.stringify({
-        channel: config.channel,
-        action: 'subscribe'
-      })
-      mobileWebSocket?.send(subscribeMsg)
-      
-      broadcast({ type: 'mobile:connected', serverUrl: config.host, mode: 'goeasy' })
-    }
-    
-    mobileWebSocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        
-        // GoEasy 消息格式处理
-        if (data.content) {
-          // 解析移动端发送的日志消息
-          try {
-            const mobileData = JSON.parse(data.content)
-            if (mobileData.type === 'log' && mobileData.payload) {
-              handleMobileLogEntry(mobileData)
-            } else if (mobileData.type === 'action' && mobileData.payload) {
-              handleMobileActionEntry(mobileData)
-            }
-          } catch {
-            // 如果不是 JSON 格式，直接作为日志内容显示
-            console.log('[ReviewLog] GoEasy message:', data.content)
-          }
-        } else if (data.success === true && data.action === 'subscribe') {
-          console.log('[ReviewLog] GoEasy subscribed to channel:', config.channel)
-        }
-      } catch (e) {
-        console.warn('[ReviewLog] Failed to parse GoEasy message:', e)
-      }
-    }
-    
-    mobileWebSocket.onclose = () => {
-      console.log('[ReviewLog] GoEasy WebSocket disconnected')
-      goEasyConnected = false
-      broadcast({ type: 'mobile:disconnected' })
-      
-      if (wsReconnectAttempts < MAX_WS_RECONNECT_ATTEMPTS) {
-        wsReconnectAttempts++
-        setTimeout(() => {
-          startGoEasyConnection(config)
-        }, WS_RECONNECT_INTERVAL * wsReconnectAttempts)
-      }
-    }
-    
-    mobileWebSocket.onerror = (error) => {
-      console.error('[ReviewLog] GoEasy WebSocket error:', error)
-    }
-  } catch (e) {
-    console.error('[ReviewLog] Failed to create GoEasy WebSocket:', e)
-  }
-}
-
-const MESSAGE_LISTENER_INIT_FLAG = '__review_log_message_listener_initialized__'
-
-// Prevent duplicate listener registration due to service worker restarts
 if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
   ;(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG] = true
 
-  function handleMessage(raw: unknown, sender: chrome.runtime.MessageSender, _sendResponse: (response?: unknown) => void) {
+  chrome.runtime.onMessage.addListener((raw, sender) => {
     const msg = raw as RuntimeMessage
 
-    if (msg.type === 'log:append') {
+    if (msg.type === "log:append") {
       const tabId = sender.tab?.id ?? -1
+      if (tabId < 0) return false
       const entry: LogEntry = { ...msg.entry, tabId }
       const tagged = appendLog(entry, tabId)
-      void broadcast({ type: 'log:append', entry: tagged })
-      // 保存到 IndexedDB
+      void broadcast({ type: "log:append", entry: tagged })
       void saveLog(tabId, entry)
       return false
     }
 
-    if (msg.type === 'action:append') {
+    if (msg.type === "action:append") {
       const tabId = sender.tab?.id ?? msg.event.tabId ?? -1
+      if (typeof tabId !== "number" || tabId < 0) return false
       const event = { ...msg.event, tabId }
       appendAction(event, tabId)
-      void broadcast({ type: 'action:append', event })
-      // 保存到 IndexedDB
+      void broadcast({ type: "action:append", event })
       void saveAction(tabId, event)
       return false
     }
 
-    if (msg.type === 'log:clear') {
-      clearKey(msg.tabId)
-      // 从 IndexedDB 删除
+    if (msg.type === "log:clear") {
+      clearKey(msg.tabId as number)
       void deleteLogsByTabId(msg.tabId)
       return false
     }
 
-    if (msg.type === 'log:request-history') {
-      const tabId = msg.tabId
+    if (msg.type === "log:request-history") {
+      const tabId = msg.tabId as number
       const entries = history.get(tabId) ?? []
       const act = actions.get(tabId) ?? []
       try {
         chrome.runtime.sendMessage({
-          type: 'log:request-history-response',
+          type: "log:request-history-response",
           entries,
           actions: act
         })
@@ -442,88 +107,27 @@ if (!(self as unknown as Record<string, boolean>)[MESSAGE_LISTENER_INIT_FLAG]) {
       return false
     }
 
-    if (msg.type === 'log:open-panel') {
+    if (msg.type === "log:open-panel") {
       void openSidePanelForActiveTab()
       return false
     }
 
-    if (msg.type === 'log:ai-result' || msg.type === 'log:ai-error') {
+    if (msg.type === "log:ai-result" || msg.type === "log:ai-error") {
       void broadcast(msg)
       return false
     }
 
-    if (msg.type === 'mobile:connect') {
-      const config = msg as { type: 'mobile:connect'; serverUrl: string; mode?: string; goeasyConfig?: GoEasyConfig }
-      
-      if (config.mode === 'goeasy' && config.goeasyConfig) {
-        startGoEasyConnection(config.goeasyConfig)
-      } else {
-        startMobilePolling(config.serverUrl)
-        chrome.runtime.sendMessage({ type: 'mobile:connected', serverUrl: config.serverUrl, mode: 'self-hosted' })
-      }
-      return false
-    }
-
-    if (msg.type === 'mobile:disconnect') {
-      stopMobilePolling()
-      chrome.runtime.sendMessage({ type: 'mobile:disconnected' })
-      return false
-    }
-
-    if (msg.type === 'mobile:get-status') {
-      try {
-        chrome.runtime.sendMessage({
-          type: 'mobile:status',
-          connected: !!mobileServerUrl || goEasyConnected,
-          serverUrl: mobileServerUrl || (goEasyConnected ? 'goeasy' : ''),
-          mode: goEasyConnected ? 'goeasy' : 'self-hosted'
-        })
-      } catch {
-        /* no listeners */
-      }
-      return false
-    }
-
-    if (msg.type === 'mobile:list-devices') {
-      const mobileKeys = getAllKeys().filter(isMobileKey)
-      try {
-        chrome.runtime.sendMessage({
-          type: 'mobile:devices',
-          devices: mobileKeys.map(k => ({
-            id: k.replace(MOBILE_PREFIX, ''),
-            logCount: history.get(k)?.length ?? 0,
-            actionCount: actions.get(k)?.length ?? 0
-          }))
-        })
-      } catch {
-        /* no listeners */
-      }
-      return false
-    }
-
     return false
-  }
-
-  chrome.runtime.onMessage.addListener(handleMessage)
+  })
 }
 
 chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
-  /* API not available on older Chrome versions */
+  /* older Chrome */
 })
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  if (typeof tabId === 'number') {
-    history.delete(tabId)
-    actions.delete(tabId)
-    seqByTab.delete(tabId)
-    // 从 IndexedDB 删除
-    void deleteLogsByTabId(tabId)
-  }
-})
-
-chrome.runtime.onStartup.addListener(() => {
-  const savedUrl = localStorage.getItem('review-log-mobile-server')
-  if (savedUrl) {
-    startMobilePolling(savedUrl)
-  }
+  history.delete(tabId)
+  actions.delete(tabId)
+  seqByTab.delete(tabId)
+  void deleteLogsByTabId(tabId)
 })

@@ -4,15 +4,16 @@ import {
   buildTranscript,
   pushAction,
   pushLog,
+  resetLogDedupe,
   type DisplayRow
 } from "../utils/logDedupe"
 import { analyzeLogs, loadConfig, saveConfig, type AiConfig } from "../utils/ai"
-import type { LogEntry, PageActionEvent, RuntimeMessage } from "../types"
+import type { RuntimeMessage } from "../types"
 import LogRow from "./components/LogRow"
 import ActionRow from "./components/ActionRow"
 import SettingsPanel from "./components/SettingsPanel"
 import AnalysisPanel from "./components/AnalysisPanel"
-import MobileSettingsPanel from "./components/MobileSettingsPanel"
+import { setSidepanelMessageHandler } from "./messageHub"
 
 import "./style.css"
 
@@ -25,7 +26,6 @@ export default function App() {
   const [autoScroll, setAutoScroll] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
-  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<{ analysis: string; fix: string } | null>(null)
@@ -38,13 +38,12 @@ export default function App() {
   }, [aiConfig])
 
   const handleMessage = useCallback((msg: RuntimeMessage) => {
-    if (!msg || typeof msg !== "object") return
-
     if (msg.type === "log:append") {
       setRows((prev) => pushLog(prev, msg.entry))
     } else if (msg.type === "action:append") {
       setRows((prev) => pushAction(prev, msg.event))
     } else if (msg.type === "log:request-history-response") {
+      resetLogDedupe()
       let next: DisplayRow[] = []
       for (const e of msg.entries) next = pushLog(next, e)
       for (const a of msg.actions) next = pushAction(next, a)
@@ -52,9 +51,12 @@ export default function App() {
     }
   }, [])
 
-  const clearActive = useCallback(() => {
+  const clearActive = useCallback(async () => {
+    resetLogDedupe()
     setRows([])
-    chrome.runtime.sendMessage({ type: "log:clear", tabId: -1 })
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+    const tabId = tabs[0]?.id ?? -1
+    chrome.runtime.sendMessage({ type: "log:clear", tabId })
   }, [])
 
   useEffect(() => {
@@ -119,40 +121,38 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    chrome.runtime.onMessage.addListener(handleMessage)
-    
+    setSidepanelMessageHandler(handleMessage)
+
     const loadTabHistory = async () => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
       const activeTab = tabs[0]
       if (activeTab?.id) {
+        resetLogDedupe()
         setRows([])
         chrome.runtime.sendMessage({ type: "log:request-history", tabId: activeTab.id })
       }
     }
 
-    loadTabHistory()
+    void loadTabHistory()
 
-    const handleTabChange = (tabId: number, info: chrome.tabs.TabChangeInfo) => {
+    const onTabActivated = () => {
+      void loadTabHistory()
+    }
+
+    const onTabUpdated = (tabId: number, info: chrome.tabs.TabChangeInfo) => {
       if (info.status === "complete") {
         chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-          const activeTab = tabs[0]
-          if (activeTab?.id === tabId) {
-            loadTabHistory()
-          }
+          if (tabs[0]?.id === tabId) void loadTabHistory()
         })
       }
     }
 
-    chrome.tabs.onActivated.addListener((activeInfo) => {
-      loadTabHistory()
-    })
-
-    chrome.tabs.onUpdated.addListener(handleTabChange)
+    chrome.tabs.onActivated.addListener(onTabActivated)
+    chrome.tabs.onUpdated.addListener(onTabUpdated)
 
     return () => {
-      chrome.runtime.onMessage.removeListener(handleMessage)
-      chrome.tabs.onActivated.removeListener(loadTabHistory)
-      chrome.tabs.onUpdated.removeListener(handleTabChange)
+      chrome.tabs.onActivated.removeListener(onTabActivated)
+      chrome.tabs.onUpdated.removeListener(onTabUpdated)
     }
   }, [handleMessage])
 
@@ -172,7 +172,6 @@ export default function App() {
           <button className="icon-btn" title="主题切换" onClick={toggleTheme}>
             {theme === "dark" ? "☀" : "☽"}
           </button>
-          <button className="icon-btn mobile-btn" title="移动端连接" onClick={() => setMobileSettingsOpen(true)}>📱</button>
           <button className="icon-btn" title="设置" onClick={() => setSettingsOpen(true)}>⚙</button>
         </div>
       </header>
@@ -229,12 +228,6 @@ export default function App() {
           config={aiConfig}
           onChange={onConfigChange}
           onClose={() => setSettingsOpen(false)}
-        />
-      )}
-
-      {mobileSettingsOpen && (
-        <MobileSettingsPanel
-          onClose={() => setMobileSettingsOpen(false)}
         />
       )}
 

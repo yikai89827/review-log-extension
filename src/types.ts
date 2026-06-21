@@ -11,7 +11,6 @@ export interface LogEntry {
   ts: number
   tabId?: number | string
   url?: string
-  source?: 'pc' | 'mobile'
 }
 
 export interface DomNode {
@@ -72,31 +71,16 @@ export interface PageActionForwardMessage {
   event: PageActionEvent & { tabId: number | string }
 }
 
-export interface MobileDevice {
-  id: string
-  logCount: number
-  actionCount: number
-}
-
 export type RuntimeMessage =
   | LogForwardMessage
   | LogClearMessage
   | PageActionForwardMessage
-  | { type: "log:subscribe" }
   | { type: "log:request-history"; tabId: number | string }
   | { type: "log:request-history-response"; entries: LogEntry[]; actions: PageActionEvent[] }
   | { type: "log:open-panel"; tabId?: number }
   | { type: "log:config"; config: AiConfig }
   | { type: "log:ai-result"; requestId: string; result: AiResult }
   | { type: "log:ai-error"; requestId: string; error: string }
-  | { type: "mobile:connect"; serverUrl: string }
-  | { type: "mobile:disconnect" }
-  | { type: "mobile:get-status" }
-  | { type: "mobile:status"; connected: boolean; serverUrl: string }
-  | { type: "mobile:connected"; serverUrl: string }
-  | { type: "mobile:disconnected" }
-  | { type: "mobile:list-devices" }
-  | { type: "mobile:devices"; devices: MobileDevice[] }
 
 export interface AiConfig {
   endpoint: string

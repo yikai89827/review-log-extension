@@ -1,8 +1,8 @@
 import { defineConfig } from "plasmo"
-import dotenv from "dotenv"
 
-// 加载环境变量
-dotenv.config()
+// 使用 --environment 标志时，Plasmo 会自动加载对应的 .env.{environment} 文件
+// 例如: --environment development 加载 .env.development
+// 不手动加载 .env，由 Plasmo 自动处理
 
 export default defineConfig({
   srcDir: "src",
