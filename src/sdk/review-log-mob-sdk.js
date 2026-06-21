@@ -142,14 +142,39 @@
     if (ws) {
       ws.close()
     }
-    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    var url = protocol + '//' + config.host + '/ws'
-    ws = new WebSocket(url)
+    
+    // 支持两种格式：
+    // 1. 完整 WebSocket URL: wss://xxx.workers.dev 或 ws://xxx.workers.dev
+    // 2. 旧格式 host:port (自动添加协议)
+    var wsUrl = config.host
+    if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+      var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      wsUrl = protocol + '//' + config.host
+    }
+    
+    // 添加 deviceId 参数
+    if (deviceId) {
+      wsUrl += '?deviceId=' + encodeURIComponent(deviceId) + '&deviceType=mobile'
+    }
+    
+    ws = new WebSocket(wsUrl)
     ws.onopen = function () {
       isConnected = true
       reconnectAttempts = 0
       if (config.debug) console.log('[ReviewLog] Connected to', config.host)
       flushQueue()
+    }
+    ws.onmessage = function (event) {
+      try {
+        var data = JSON.parse(event.data)
+        if (config.debug) console.log('[ReviewLog] Received:', data)
+        // 处理服务器消息
+        if (data.type === 'connected') {
+          if (config.debug) console.log('[ReviewLog] Server confirmed connection:', data.sessionId)
+        }
+      } catch (e) {
+        if (config.debug) console.log('[ReviewLog] Raw message:', event.data)
+      }
     }
     ws.onclose = function () {
       isConnected = false

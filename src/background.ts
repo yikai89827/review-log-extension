@@ -143,20 +143,131 @@ function handleMobileEntry(entry: MobileLogEntry) {
 
 let mobileServerUrl = ''
 let pollingInterval: number | null = null
+let mobileWebSocket: WebSocket | null = null
+let wsReconnectAttempts = 0
+const MAX_WS_RECONNECT_ATTEMPTS = 10
+const WS_RECONNECT_INTERVAL = 3000
 
 function startMobilePolling(url: string) {
   stopMobilePolling()
   mobileServerUrl = url
-  fetchMobileLogs(url)
-  pollingInterval = window.setInterval(() => {
+  
+  // 检查是否是 WebSocket URL
+  if (url.startsWith('ws://') || url.startsWith('wss://') || url.includes('workers.dev')) {
+    startWebSocketConnection(url)
+  } else {
+    // 使用旧的 HTTP polling 方式
     fetchMobileLogs(url)
-  }, 2000)
+    pollingInterval = window.setInterval(() => {
+      fetchMobileLogs(url)
+    }, 2000)
+  }
+}
+
+function startWebSocketConnection(url: string) {
+  if (mobileWebSocket) {
+    mobileWebSocket.close()
+  }
+  
+  // 确保 URL 格式正确
+  let wsUrl = url
+  if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+    wsUrl = 'wss://' + wsUrl
+  }
+  
+  // 添加 deviceType 参数
+  wsUrl += '?deviceType=extension'
+  
+  try {
+    mobileWebSocket = new WebSocket(wsUrl)
+    
+    mobileWebSocket.onopen = () => {
+      wsReconnectAttempts = 0
+      console.log('[ReviewLog] WebSocket connected to', wsUrl)
+      // 通知扩展端已连接
+      broadcast({ type: 'mobile:connected', serverUrl: mobileServerUrl })
+    }
+    
+    mobileWebSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        
+        // 处理移动端发送的日志和动作
+        if (data.type === 'log' && data.payload) {
+          handleMobileLogEntry(data)
+        } else if (data.type === 'action' && data.payload) {
+          handleMobileActionEntry(data)
+        } else if (data.type === 'connected') {
+          console.log('[ReviewLog] Server confirmed connection:', data.sessionId)
+        }
+      } catch (e) {
+        console.warn('[ReviewLog] Failed to parse WebSocket message:', e)
+      }
+    }
+    
+    mobileWebSocket.onclose = () => {
+      console.log('[ReviewLog] WebSocket disconnected')
+      broadcast({ type: 'mobile:disconnected' })
+      
+      // 自动重连
+      if (wsReconnectAttempts < MAX_WS_RECONNECT_ATTEMPTS) {
+        wsReconnectAttempts++
+        setTimeout(() => {
+          if (mobileServerUrl) {
+            startWebSocketConnection(mobileServerUrl)
+          }
+        }, WS_RECONNECT_INTERVAL * wsReconnectAttempts)
+      }
+    }
+    
+    mobileWebSocket.onerror = (error) => {
+      console.error('[ReviewLog] WebSocket error:', error)
+    }
+  } catch (e) {
+    console.error('[ReviewLog] Failed to create WebSocket:', e)
+    // 回退到 HTTP polling
+    fetchMobileLogs(url)
+    pollingInterval = window.setInterval(() => {
+      fetchMobileLogs(url)
+    }, 2000)
+  }
+}
+
+function handleMobileLogEntry(data: MobileLogEntry) {
+  const key = getMobileKey(data.deviceId)
+  const entry: LogEntry = {
+    seq: 0,
+    level: data.payload.level,
+    args: data.payload.args,
+    text: data.payload.text,
+    ts: data.timestamp,
+    url: data.url,
+    tabId: key as unknown as number
+  }
+  const tagged = appendLog(entry, key)
+  broadcast({ type: 'log:append', entry: tagged })
+}
+
+function handleMobileActionEntry(data: MobileLogEntry) {
+  const key = getMobileKey(data.deviceId)
+  const actionEvent: PageActionEvent = {
+    action: data.payload.action,
+    target: data.payload.target,
+    ts: data.timestamp,
+    tabId: key as unknown as number
+  }
+  appendAction(actionEvent, key)
+  broadcast({ type: 'action:append', event: { ...actionEvent, tabId: key as unknown as number } })
 }
 
 function stopMobilePolling() {
   if (pollingInterval) {
     clearInterval(pollingInterval)
     pollingInterval = null
+  }
+  if (mobileWebSocket) {
+    mobileWebSocket.close()
+    mobileWebSocket = null
   }
 }
 

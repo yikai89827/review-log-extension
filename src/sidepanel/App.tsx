@@ -12,6 +12,7 @@ import LogRow from "./components/LogRow"
 import ActionRow from "./components/ActionRow"
 import SettingsPanel from "./components/SettingsPanel"
 import AnalysisPanel from "./components/AnalysisPanel"
+import MobileSettingsPanel from "./components/MobileSettingsPanel"
 
 import "./style.css"
 
@@ -24,6 +25,7 @@ export default function App() {
   const [autoScroll, setAutoScroll] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<{ analysis: string; fix: string } | null>(null)
@@ -170,6 +172,7 @@ export default function App() {
           <button className="icon-btn" title="主题切换" onClick={toggleTheme}>
             {theme === "dark" ? "☀" : "☽"}
           </button>
+          <button className="icon-btn mobile-btn" title="移动端连接" onClick={() => setMobileSettingsOpen(true)}>📱</button>
           <button className="icon-btn" title="设置" onClick={() => setSettingsOpen(true)}>⚙</button>
         </div>
       </header>
@@ -226,6 +229,12 @@ export default function App() {
           config={aiConfig}
           onChange={onConfigChange}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {mobileSettingsOpen && (
+        <MobileSettingsPanel
+          onClose={() => setMobileSettingsOpen(false)}
         />
       )}
 
