@@ -139,3 +139,9 @@ export interface AiResult {
   analysis: string
   fix: string
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}

@@ -1,4 +1,5 @@
-import type { AiResult } from "../../utils/ai"
+import { useState, useRef, useEffect } from "react"
+import type { AiResult, ChatMessage } from "../../utils/ai"
 
 import "./AnalysisPanel.css"
 
@@ -6,6 +7,8 @@ interface Props {
   analyzing: boolean
   result: AiResult | null
   error: string | null
+  transcript: string
+  onChat: (message: string, chatHistory: ChatMessage[]) => Promise<string>
   onClose: () => void
 }
 
@@ -43,7 +46,73 @@ function renderMarkdown(s: string): string {
   return html
 }
 
-export default function AnalysisPanel({ analyzing, result, error, onClose }: Props) {
+export default function AnalysisPanel({ analyzing, result, error, transcript, onChat, onClose }: Props) {
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatError, setChatError] = useState<string | null>(null)
+  const chatListRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // 自动滚动到最新消息
+  useEffect(() => {
+    if (chatListRef.current) {
+      chatListRef.current.scrollTop = chatListRef.current.scrollHeight
+    }
+  }, [chatHistory])
+
+  // 分析完成后聚焦输入框
+  useEffect(() => {
+    if (result && !analyzing && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [result, analyzing])
+
+  const handleSendMessage = async () => {
+    const message = chatInput.trim()
+    if (!message || chatLoading) return
+
+    setChatInput("")
+    setChatError(null)
+    setChatLoading(true)
+
+    // 添加用户消息
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: message,
+      timestamp: Date.now()
+    }
+    const newHistory = [...chatHistory, userMsg]
+    setChatHistory(newHistory)
+
+    try {
+      // 调用 AI 对话
+      const response = await onChat(message, chatHistory)
+      
+      // 添加 AI 回复
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: response,
+        timestamp: Date.now()
+      }
+      setChatHistory([...newHistory, assistantMsg])
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "对话失败")
+      // 移除用户消息（失败时）
+      setChatHistory(chatHistory)
+    } finally {
+      setChatLoading(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
   return (
     <div className="analysis-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="analysis-panel">
@@ -61,13 +130,66 @@ export default function AnalysisPanel({ analyzing, result, error, onClose }: Pro
           {error && !analyzing && <div className="analysis-error">{error}</div>}
           {result && !analyzing && !error && (
             <>
-              <section>
+              <section className="analysis-result-section">
                 <h3 className="md-h3">原因分析</h3>
                 <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.analysis) }} />
               </section>
-              <section>
+              <section className="analysis-result-section">
                 <h3 className="md-h3">修复建议</h3>
                 <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.fix) }} />
+              </section>
+              
+              {/* 对话区域 */}
+              <section className="chat-section">
+                <h3 className="md-h3 chat-title">继续对话</h3>
+                <div className="chat-list" ref={chatListRef}>
+                  {chatHistory.length === 0 && (
+                    <div className="chat-empty">
+                      有更多问题？输入下方输入框继续与 AI 沟通
+                    </div>
+                  )}
+                  {chatHistory.map((msg, idx) => (
+                    <div key={idx} className={`chat-message chat-${msg.role}`}>
+                      <div className="chat-avatar">
+                        {msg.role === 'user' ? '👤' : '🤖'}
+                      </div>
+                      <div className="chat-content">
+                        <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div className="chat-message chat-assistant">
+                      <div className="chat-avatar">🤖</div>
+                      <div className="chat-content chat-loading-msg">
+                        <span className="spinner-small"></span>
+                        正在思考...
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {chatError && <div className="chat-error">{chatError}</div>}
+                
+                <div className="chat-input-area">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="chat-input"
+                    placeholder="输入问题继续对话..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={chatLoading}
+                  />
+                  <button
+                    className="chat-send-btn"
+                    onClick={handleSendMessage}
+                    disabled={chatLoading || !chatInput.trim()}
+                  >
+                    发送
+                  </button>
+                </div>
               </section>
             </>
           )}

@@ -12,8 +12,8 @@ import {
   rowMatchesSearch,
   type DisplayRow
 } from "../utils/logDedupe"
-import { analyzeLogs, loadConfig, saveConfig } from "../utils/ai"
-import type { AiConfig } from "../types"
+import { analyzeLogs, loadConfig, saveConfig, chatWithAI, analyzeSingleLog } from "../utils/ai"
+import type { AiConfig, ChatMessage } from "../types"
 import { safeRuntimeSendMessage } from "../utils/extensionContext"
 import { copyText, downloadText } from "../utils/clipboard"
 import { highlightDomInActiveTab } from "../utils/domInspect"
@@ -68,6 +68,7 @@ export default function App() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<{ analysis: string; fix: string } | null>(null)
+  const [analysisTranscript, setAnalysisTranscript] = useState<string>("")
   const [theme, setTheme] = useState<ThemeType>("dark")
   const [copyToast, setCopyToast] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -188,6 +189,7 @@ export default function App() {
     try {
       const transcript = buildTranscript(sortedRows)
       if (!transcript.trim()) throw new Error("当前没有可分析的事件流。")
+      setAnalysisTranscript(transcript)
       const result = await analyzeLogs(aiConfig, transcript)
       setAnalysis(result)
     } catch (err) {
@@ -196,6 +198,34 @@ export default function App() {
       setAnalyzing(false)
     }
   }, [analyzing, sortedRows, aiConfig])
+
+  // 分析单条日志
+  const analyzeSingleRow = useCallback(async (row: DisplayRow) => {
+    if (analyzing) return
+    setAnalyzing(true)
+    setAnalysisError(null)
+    setAnalysisOpen(true)
+    setAnalysis(null)
+
+    try {
+      const logText = rowCopyText(row)
+      setAnalysisTranscript(logText)
+      const result = await analyzeSingleLog(aiConfig, logText)
+      setAnalysis(result)
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAnalyzing(false)
+    }
+  }, [analyzing, aiConfig])
+
+  // AI 对话回调函数
+  const handleChat = useCallback(async (message: string, chatHistory: ChatMessage[]): Promise<string> => {
+    if (!analysis) {
+      throw new Error("请先完成日志分析")
+    }
+    return chatWithAI(aiConfig, analysisTranscript, analysis, chatHistory, message)
+  }, [aiConfig, analysisTranscript, analysis])
 
   useEffect(() => {
     setSidepanelMessageHandler(handleMessage)
@@ -339,7 +369,10 @@ export default function App() {
           onClose={() => setContextMenu(null)}
           items={[
             ...(contextMenu.row
-              ? [{ label: "复制本条日志", onClick: () => void copyRow(contextMenu.row!) }]
+              ? [
+                  { label: "复制本条日志", onClick: () => void copyRow(contextMenu.row!) },
+                  { label: "发送本条日志到 AI", onClick: () => void analyzeSingleRow(contextMenu.row!) }
+                ]
               : []),
             { label: "复制全部（当前列表）", onClick: () => void copyAllVisible() },
             { label: "导出 txt + json", onClick: exportLogs }
@@ -354,6 +387,8 @@ export default function App() {
           analyzing={analyzing}
           result={analysis}
           error={analysisError}
+          transcript={analysisTranscript}
+          onChat={handleChat}
           onClose={() => setAnalysisOpen(false)}
         />
       )}
