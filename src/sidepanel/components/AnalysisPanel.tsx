@@ -132,12 +132,28 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
     }
   }
 
+  // 滚动到顶部
+  const scrollToTop = () => {
+    if (chatListRef.current) {
+      chatListRef.current.scrollTop = 0
+    }
+  }
+
   return (
     <div className="analysis-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="analysis-panel">
         <div className="analysis-header">
           <div className="analysis-title">AI 分析</div>
-          <button className="icon-btn" onClick={onClose}>×</button>
+          <div className="analysis-actions">
+            <button 
+              className="icon-btn scroll-top-btn" 
+              onClick={scrollToTop}
+              title="滚动到顶部"
+            >
+              ⬆️
+            </button>
+            <button className="icon-btn" onClick={onClose}>×</button>
+          </div>
         </div>
         <div className="analysis-body">
           {analyzing && (

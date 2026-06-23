@@ -173,6 +173,11 @@ export default function App() {
     showToast("已导出 txt + json")
   }, [rows, showToast])
 
+  const scrollToTop = useCallback(() => {
+    const el = document.getElementById("log-scroll")
+    if (el) el.scrollTop = 0
+  }, [])
+
   const openRowContextMenu = useCallback((e: React.MouseEvent, row?: DisplayRow) => {
     e.preventDefault()
     e.stopPropagation()
@@ -270,7 +275,8 @@ export default function App() {
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         <div className="header-actions">
-          <button className="icon-btn" title="导出日志" onClick={exportLogs}>⤓</button>
+          <button className="icon-btn" title="滚动到顶部" onClick={scrollToTop}>⬆️</button>
+          <button className="icon-btn" title="导出日志" onClick={exportLogs}>📥</button>
           <button
             className="icon-btn"
             aria-pressed={autoScroll}
@@ -375,7 +381,7 @@ export default function App() {
                 ]
               : []),
             { label: "复制全部（当前列表）", onClick: () => void copyAllVisible() },
-            { label: "导出 txt + json", onClick: exportLogs }
+            { label: "📥 导出日志", onClick: exportLogs }
           ]}
         />
       )}

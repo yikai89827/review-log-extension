@@ -26,6 +26,15 @@
   background: #1c1c20;
 }
 
+.analysis-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.scroll-top-btn {
+  font-size: 14px !important;
+}
+
 .analysis-title {
   font-weight: 600;
   font-size: 14px;
