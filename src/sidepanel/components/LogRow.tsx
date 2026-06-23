@@ -87,8 +87,10 @@ export default function LogRow({
       className={`log-row level-${row.level}${row.inputKey ? " log-row-input" : ""}`}
       onContextMenu={onContextMenu}
     >
-      <div className="row-time">{time}</div>
-      <div className="row-level">{row.level.toUpperCase()}</div>
+      <div className="row-meta">
+        <div className="row-time">{time}</div>
+        <div className="row-level">{row.level.toUpperCase()}</div>
+      </div>
       <div className="row-content">
         {hasObjects ? (
           <div className="row-args">

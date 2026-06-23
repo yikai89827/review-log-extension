@@ -1,6 +1,6 @@
 .log-row {
   display: grid;
-  grid-template-columns: 60px 56px minmax(0, 1fr) auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   gap: 8px;
   padding: 4px 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -13,10 +13,25 @@
   white-space: pre-wrap;
 }
 
+.app-shell.light .log-row {
+  border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+/* 时间戳和级别容器 */
+.row-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .row-time {
   color: rgba(255, 255, 255, 0.4);
   font-size: 11px;
-  padding-top: 2px;
+}
+
+.app-shell.light .row-time {
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .row-level {
@@ -26,9 +41,48 @@
   text-align: center;
   border-radius: 4px;
   padding: 1px 4px;
-  align-self: start;
-  height: fit-content;
-  margin-top: 2px;
+  width: fit-content;
+}
+
+.app-shell.light .level-log .row-level {
+  background: rgba(75, 85, 99, 0.15);
+  color: #4b5563;
+}
+
+.app-shell.light .level-info .row-level {
+  background: rgba(24, 119, 242, 0.15);
+  color: #1d4ed8;
+}
+
+.app-shell.light .level-debug .row-level {
+  background: rgba(75, 85, 99, 0.15);
+  color: #4b5563;
+}
+
+.app-shell.light .level-warn .row-level {
+  background: rgba(202, 138, 4, 0.15);
+  color: #b45309;
+}
+
+.app-shell.light .level-error {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.app-shell.light .level-error .row-level {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.app-shell.light .level-error .row-time {
+  color: rgba(239, 68, 68, 0.7);
+}
+
+.app-shell.light .level-error .row-text {
+  color: #dc2626;
+}
+
+.app-shell.light .level-error .arg-item {
+  color: #dc2626;
 }
 
 .level-log .row-level {
@@ -88,6 +142,10 @@
   max-width: 100%;
 }
 
+.app-shell.light .row-text {
+  color: #374151;
+}
+
 .error-block {
   min-width: 0;
   max-width: 100%;
@@ -101,8 +159,16 @@
   word-break: break-word;
 }
 
+.app-shell.light .related-network {
+  color: #059669;
+}
+
 .log-row-input .row-text {
   color: #93c5fd;
+}
+
+.app-shell.light .log-row-input .row-text {
+  color: #2563eb;
 }
 
 .row-args {
@@ -122,6 +188,10 @@
   word-break: break-word;
 }
 
+.app-shell.light .arg-item {
+  color: #374151;
+}
+
 .row-count {
   font-size: 10px;
   font-weight: 700;
@@ -133,6 +203,12 @@
   align-self: start;
   height: fit-content;
   margin-top: 2px;
+}
+
+.app-shell.light .row-count {
+  color: #b45309;
+  background: rgba(202, 138, 4, 0.12);
+  border-color: rgba(202, 138, 4, 0.3);
 }
 
 .clamped-text {
