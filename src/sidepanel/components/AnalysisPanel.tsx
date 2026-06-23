@@ -52,15 +52,33 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
   const [chatLoading, setChatLoading] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
   const [chatExpanded, setChatExpanded] = useState(false)
+  const [isAtBottom, setIsAtBottom] = useState(true)
   const chatListRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 自动滚动到最新消息
+  // 检测是否滚动到底部
+  const handleScroll = () => {
+    if (!chatListRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = chatListRef.current
+    // 当滚动位置距离底部小于 50px 时，认为用户在底部
+    setIsAtBottom(scrollHeight - scrollTop - clientHeight < 50)
+  }
+
+  // 自动滚动到最新消息 - 只有当用户在底部时才滚动
   useEffect(() => {
-    if (chatListRef.current) {
+    if (chatListRef.current && isAtBottom) {
       chatListRef.current.scrollTop = chatListRef.current.scrollHeight
     }
-  }, [chatHistory])
+  }, [chatHistory, isAtBottom])
+
+  // 添加滚动事件监听
+  useEffect(() => {
+    const list = chatListRef.current
+    if (list) {
+      list.addEventListener('scroll', handleScroll)
+      return () => list.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
 
   // 分析完成后聚焦输入框
   useEffect(() => {
