@@ -31,12 +31,12 @@ function formatValue(value: SerializedArg): string {
     case "error":
       return `${value.name}: ${value.message}`
     case "object":
-      return typeof value.value === "object" ? (Array.isArray(value.value) ? `Array(${value.value.length})` : "Object") : String(value.value)
+      return typeof value.value === "object" ? (Array.isArray(value.value) ? `Array(${value.value.length})` : "Object") : String((value as { value: unknown }).value)
     case "dom":
       const dom = value.value
       return `<${dom.tagName || dom.nodeName.toLowerCase()}>${dom.textContent ? ` "${dom.textContent.slice(0, 20)}${dom.textContent.length > 20 ? "..." : ""}"` : ""}`
     default:
-      return String(value.value)
+      return String((value as { value: unknown }).value)
   }
 }
 
@@ -155,7 +155,7 @@ function DomEntry({ node, depth, defaultExpanded }: { node: DomNode; depth: numb
 }
 
 function Entry({ keyName, value, depth, defaultExpanded, relatedSelector }: EntryProps) {
-  const [expanded, setExpanded] = useState(depth === 0 && defaultExpanded)
+  const [expanded, setExpanded] = useState(false)
   const expandable = isExpandable(value)
   const typeColor = getTypeColor(value)
   const displayValue = formatValue(value)
@@ -181,7 +181,7 @@ function Entry({ keyName, value, depth, defaultExpanded, relatedSelector }: Entr
         <div className="entry-line">
           {expandable && (
             <button
-              className="expand-btn"
+              className="object-expand-btn"
               onClick={() => setExpanded(!expanded)}
               title={expanded ? "折叠" : "展开"}
             >
@@ -211,7 +211,7 @@ function Entry({ keyName, value, depth, defaultExpanded, relatedSelector }: Entr
       <div className="entry-line">
         {expandable && (
           <button
-            className="expand-btn"
+            className="object-expand-btn"
             onClick={() => setExpanded(!expanded)}
             title={expanded ? "折叠" : "展开"}
           >
