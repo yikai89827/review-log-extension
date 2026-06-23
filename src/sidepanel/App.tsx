@@ -283,7 +283,7 @@ export default function App() {
             title="自动滚动到底部"
             onClick={() => setAutoScroll(!autoScroll)}
           >
-            {autoScroll ? "⇣" : "⇡"}
+            {autoScroll ? "✅" : "⬇️"}
           </button>
           <button className="icon-btn" title="清空" onClick={clearActive}>⌫</button>
           <button className="icon-btn" title="主题切换" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
