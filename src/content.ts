@@ -93,14 +93,113 @@ function ensureRuntimeListener(): void {
   if (w[RUNTIME_LISTENER_KEY]) return
   w[RUNTIME_LISTENER_KEY] = true
 
-  chrome.runtime.onMessage.addListener((raw) => {
+  chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
     if (!isExtensionContextValid()) return false
     const msg = raw as { type?: string; payload?: DomHighlightPayload }
+    
     if (msg?.type === "log:highlight-dom" && msg.payload) {
       postHighlightToPage(msg.payload)
     }
+    
+    // 获取 DOM 结构信息
+    if (msg?.type === "GET_DOM_INFO") {
+      const domInfo = getDomInfo()
+      sendResponse({ domInfo })
+      return true // 表示异步响应
+    }
+    
+    // 获取 JS 文件列表
+    if (msg?.type === "GET_JS_FILES") {
+      const jsFiles = getJsFiles()
+      sendResponse({ jsFiles })
+      return true // 表示异步响应
+    }
+    
     return false
   })
+}
+
+// 获取 DOM 结构信息
+function getDomInfo(): string {
+  try {
+    const body = document.body
+    if (!body) return "无法获取 DOM 结构"
+    
+    // 获取页面标题
+    const title = document.title || "无标题"
+    
+    // 获取脚本数量
+    const scripts = document.querySelectorAll('script')
+    const scriptCount = scripts.length
+    
+    // 获取链接数量
+    const links = document.querySelectorAll('link')
+    const linkCount = links.length
+    
+    // 获取图片数量
+    const images = document.querySelectorAll('img')
+    const imageCount = images.length
+    
+    // 获取表单数量
+    const forms = document.querySelectorAll('form')
+    const formCount = forms.length
+    
+    // 获取主要的 HTML 结构
+    function getElementStructure(el: Element, depth: number = 0): string {
+      if (depth > 3) return "" // 限制深度
+      
+      const tagName = el.tagName.toLowerCase()
+      const id = el.id ? `#${el.id}` : ""
+      // className 可能是 SVGAnimatedString，需要转为字符串
+      const className = el.className ? String(el.className).replace(/\s+/g, ".") : ""
+      const classAttr = className ? `.${className}` : ""
+      const children = Array.from(el.children).slice(0, 5) // 只取前5个子元素
+      
+      let result = `${"  ".repeat(depth)}<${tagName}${id}${classAttr}>`
+      if (children.length > 0) {
+        result += "\n" + children.map(child => getElementStructure(child, depth + 1)).join("\n")
+      }
+      return result
+    }
+    
+    const structure = getElementStructure(body, 0)
+    
+    return `页面标题: ${title}
+
+页面统计:
+- 脚本数量: ${scriptCount}
+- 样式链接: ${linkCount}
+- 图片数量: ${imageCount}
+- 表单数量: ${formCount}
+
+DOM 结构概览:
+${structure}`
+    
+  } catch (e) {
+    return `获取 DOM 信息失败: ${e instanceof Error ? e.message : String(e)}`
+  }
+}
+
+// 获取加载的 JS 文件列表
+function getJsFiles(): string {
+  try {
+    const scripts = document.querySelectorAll('script[src]')
+    const jsFiles = Array.from(scripts).map((script, index) => {
+      const src = (script as HTMLScriptElement).src
+      const async = script.hasAttribute('async') ? '[async]' : ''
+      const defer = script.hasAttribute('defer') ? '[defer]' : ''
+      return `${index + 1}. ${async}${defer} ${src}`
+    })
+    
+    if (jsFiles.length === 0) {
+      return "页面中没有外部 JS 文件"
+    }
+    
+    return jsFiles.join("\n")
+    
+  } catch (e) {
+    return `获取 JS 文件列表失败: ${e instanceof Error ? e.message : String(e)}`
+  }
 }
 
 ensureRuntimeListener()

@@ -35,11 +35,14 @@ function renderMarkdown(s: string): string {
   html = html.replace(/(^|\n)###\s+(.*)/g, '$1<h4 class="md-h4">$2</h4>')
   html = html.replace(/(^|\n)##\s+(.*)/g, '$1<h3 class="md-h3">$2</h3>')
   
+  // 处理普通文本中的换行（保留换行符）
   html = html
     .split(/\n{2,}/)
     .map((block) => {
       if (/^\s*<(h\d|ul|pre|li)/.test(block)) return block
-      return `<p>${block.replace(/\n/g, "<br>")}</p>`
+      // 替换单换行符为 <br>
+      const withBreaks = block.replace(/\n/g, "<br>")
+      return `<p>${withBreaks}</p>`
     })
     .join("\n")
   
@@ -53,6 +56,8 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
   const [chatError, setChatError] = useState<string | null>(null)
   const [chatExpanded, setChatExpanded] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [includeDom, setIncludeDom] = useState(false)
+  const [includeJsFiles, setIncludeJsFiles] = useState(false)
   const chatListRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -95,10 +100,44 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
     setChatError(null)
     setChatLoading(true)
 
-    // 添加用户消息
+    // 获取附加信息
+    let extraInfo = ""
+    if (includeDom) {
+      // 发送消息到 content script 获取 DOM 信息
+      const domInfo = await new Promise<string>((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: "GET_DOM_INFO" }, (response) => {
+              resolve(response?.domInfo || "")
+            })
+          } else {
+            resolve("")
+          }
+        })
+      })
+      extraInfo += `\n\n--- DOM 结构信息 ---\n${domInfo}`
+    }
+
+    if (includeJsFiles) {
+      // 发送消息到 content script 获取 JS 文件列表
+      const jsFiles = await new Promise<string>((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: "GET_JS_FILES" }, (response) => {
+              resolve(response?.jsFiles || "")
+            })
+          } else {
+            resolve("")
+          }
+        })
+      })
+      extraInfo += `\n\n--- 加载的 JS 文件 ---\n${jsFiles}`
+    }
+
+    // 添加用户消息（包含附加信息）
     const userMsg: ChatMessage = {
       role: 'user',
-      content: message,
+      content: message + extraInfo,
       timestamp: Date.now()
     }
     const newHistory = [...chatHistory, userMsg]
@@ -106,7 +145,7 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
 
     try {
       // 调用 AI 对话
-      const response = await onChat(message, chatHistory)
+      const response = await onChat(message + extraInfo, chatHistory)
       
       // 添加 AI 回复
       const assistantMsg: ChatMessage = {
@@ -221,23 +260,45 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
                 {chatError && <div className="chat-error">{chatError}</div>}
                 
                 <div className="chat-input-area">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    className="chat-input"
-                    placeholder="输入问题继续对话..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={chatLoading}
-                  />
-                  <button
-                    className="chat-send-btn"
-                    onClick={handleSendMessage}
-                    disabled={chatLoading || !chatInput.trim()}
-                  >
-                    发送
-                  </button>
+                  <div className="chat-options">
+                    <label className="chat-option">
+                      <input
+                        type="checkbox"
+                        checked={includeDom}
+                        onChange={(e) => setIncludeDom(e.target.checked)}
+                        disabled={chatLoading}
+                      />
+                      <span>包含 DOM 结构</span>
+                    </label>
+                    <label className="chat-option">
+                      <input
+                        type="checkbox"
+                        checked={includeJsFiles}
+                        onChange={(e) => setIncludeJsFiles(e.target.checked)}
+                        disabled={chatLoading}
+                      />
+                      <span>包含 JS 文件列表</span>
+                    </label>
+                  </div>
+                  <div className="chat-input-row">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      className="chat-input"
+                      placeholder="输入问题继续对话..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={chatLoading}
+                    />
+                    <button
+                      className="chat-send-btn"
+                      onClick={handleSendMessage}
+                      disabled={chatLoading || !chatInput.trim()}
+                    >
+                      发送
+                    </button>
+                  </div>
                 </div>
               </section>
             </>
