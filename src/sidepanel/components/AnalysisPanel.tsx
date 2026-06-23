@@ -51,6 +51,7 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
   const [chatInput, setChatInput] = useState("")
   const [chatLoading, setChatLoading] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
+  const [chatExpanded, setChatExpanded] = useState(false)
   const chatListRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -130,18 +131,32 @@ export default function AnalysisPanel({ analyzing, result, error, transcript, on
           {error && !analyzing && <div className="analysis-error">{error}</div>}
           {result && !analyzing && !error && (
             <>
-              <section className="analysis-result-section">
-                <h3 className="md-h3">原因分析</h3>
-                <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.analysis) }} />
-              </section>
-              <section className="analysis-result-section">
-                <h3 className="md-h3">修复建议</h3>
-                <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.fix) }} />
-              </section>
+              {/* 分析结果区域 - 展开对话时隐藏 */}
+              {!chatExpanded && (
+                <>
+                  <section className="analysis-result-section">
+                    <h3 className="md-h3">原因分析</h3>
+                    <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.analysis) }} />
+                  </section>
+                  <section className="analysis-result-section">
+                    <h3 className="md-h3">修复建议</h3>
+                    <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.fix) }} />
+                  </section>
+                </>
+              )}
               
               {/* 对话区域 */}
-              <section className="chat-section">
-                <h3 className="md-h3 chat-title">继续对话</h3>
+              <section className={`chat-section ${chatExpanded ? 'chat-expanded' : ''}`}>
+                <div className="chat-header">
+                  <h3 className="md-h3 chat-title">继续对话</h3>
+                  <button
+                    className="expand-btn"
+                    onClick={() => setChatExpanded(!chatExpanded)}
+                    title={chatExpanded ? '收起对话' : '展开对话'}
+                  >
+                    {chatExpanded ? '收起对话' : '展开对话'}
+                  </button>
+                </div>
                 <div className="chat-list" ref={chatListRef}>
                   {chatHistory.length === 0 && (
                     <div className="chat-empty">
